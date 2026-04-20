@@ -1,5 +1,6 @@
 import { Baloo_2, Nunito } from 'next/font/google'
 import './globals.css'
+import Header from './components/Header'
 
 const baloo = Baloo_2({
   subsets: ['latin'],
@@ -23,7 +24,10 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="fr" className={`${baloo.variable} ${nunito.variable}`}>
-      <body>{children}</body>
+      <body>
+        <Header />
+        {children}
+      </body>
     </html>
   )
 }
