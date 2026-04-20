@@ -17,7 +17,8 @@ export default function ProfilPage() {
     children: 0,
     children_ages: '',
     constraints: [],
-    cuisines: []
+    cuisines: [],
+    preferences: ''
   })
 
   useEffect(() => {
@@ -38,7 +39,8 @@ export default function ProfilPage() {
           children: data.children,
           children_ages: (data.children_ages || []).join(', '),
           constraints: data.constraints || [],
-          cuisines: data.cuisines || []
+          cuisines: data.cuisines || [],
+          preferences: data.preferences || ''
         })
       }
       setLoading(false)
@@ -66,6 +68,7 @@ export default function ProfilPage() {
       children_ages: ages,
       constraints: form.constraints,
       cuisines: form.cuisines,
+      preferences: form.preferences,
       updated_at: new Date().toISOString()
     }
 
@@ -144,6 +147,16 @@ export default function ProfilPage() {
               </span>
             ))}
           </div>
+        </div>
+
+        <div>
+          <label style={{ display: 'block', marginBottom: 6, fontSize: 14, fontWeight: 500 }}>Préférences alimentaires libres</label>
+          <textarea
+            placeholder="Ex. : pas de four, léger le soir, pas d'abats, enfants n'aiment pas le poisson cru"
+            value={form.preferences}
+            onChange={e => setForm({ ...form, preferences: e.target.value })}
+            rows={4}
+            style={{ width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, resize: 'vertical', fontFamily: 'Arial' }} />
         </div>
 
         <button type="submit" disabled={saving}
