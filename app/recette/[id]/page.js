@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
+import BackButton from '@/app/components/BackButton'
 
 export default function RecettePage() {
   const router = useRouter()
@@ -74,11 +75,7 @@ export default function RecettePage() {
 
   return (
     <main style={{ maxWidth: 560, margin: '40px auto', padding: '0 24px', fontFamily: 'Arial' }}>
-      <button
-        onClick={() => planningId ? router.push(`/menu/${planningId}`) : router.back()}
-        style={{ fontSize: 13, color: '#0070f3', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 20, padding: 0 }}>
-        ← Retour au menu
-      </button>
+      <BackButton label="Retour au menu" href={planningId ? `/menu/${planningId}` : null} />
 
       <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 12 }}>{recipe.name}</h1>
 

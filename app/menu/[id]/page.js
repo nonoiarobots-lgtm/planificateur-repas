@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
+import BackButton from '@/app/components/BackButton'
 
 export default function MenuPage() {
   const router = useRouter()
@@ -87,6 +88,7 @@ export default function MenuPage() {
 
   return (
     <main style={{ maxWidth: 560, margin: '40px auto', padding: '0 24px', fontFamily: 'Arial' }}>
+      <BackButton label="Planification" href="/planning" />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 600 }}>Menu de la semaine</h1>
         <button onClick={() => router.push('/planning')}
