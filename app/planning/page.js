@@ -15,30 +15,23 @@ export default function PlanningPage() {
   const [generating, setGenerating] = useState(false)
   const [loadingStep, setLoadingStep] = useState(0)
   const [error, setError] = useState(null)
-
-  const LOADING_STEPS = [
-    'Composition du menu en cours...',
-    'Sélection des recettes...',
-    'Préparation de la liste de courses...',
-  ]
   const [startDate, setStartDate] = useState(null)
   const [slots, setSlots] = useState([])
+
+  const LOADING_STEPS = [
+    '✨ Composition du menu en cours...',
+    '👨‍🍳 Sélection des recettes...',
+    '🛒 Préparation de la liste de courses...',
+  ]
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/auth/login'); return }
       setUser(user)
-
-      const { data: fam } = await supabase
-        .from('families')
-        .select('*')
-        .eq('user_id', user.id)
-        .single()
-
+      const { data: fam } = await supabase.from('families').select('*').eq('user_id', user.id).single()
       if (!fam) { router.push('/profil'); return }
       setFamily(fam)
-
       const today = new Date()
       today.setHours(0,0,0,0)
       setStartDate(today)
@@ -114,22 +107,14 @@ export default function PlanningPage() {
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-
         buffer += decoder.decode(value, { stream: true })
         const parts = buffer.split('\n\n')
         buffer = parts.pop()
-
         for (const part of parts) {
           if (!part.startsWith('data: ')) continue
           const event = JSON.parse(part.slice(6))
-          if (event.type === 'done') {
-            clearInterval(stepTimer)
-            router.push(`/menu/${event.planningId}`)
-            return
-          }
-          if (event.type === 'error') {
-            throw new Error(event.message)
-          }
+          if (event.type === 'done') { clearInterval(stepTimer); router.push(`/menu/${event.planningId}`); return }
+          if (event.type === 'error') throw new Error(event.message)
         }
       }
     } catch (err) {
@@ -140,41 +125,68 @@ export default function PlanningPage() {
     }
   }
 
-  if (loading) return <p style={{ padding: 40, fontFamily: 'Arial' }}>Chargement...</p>
+  if (loading) return (
+    <main style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+      <p style={{ fontFamily: "'Nunito', sans-serif", color: 'var(--text-muted)' }}>Chargement...</p>
+    </main>
+  )
 
   const endDate = startDate ? new Date(new Date(startDate).setDate(startDate.getDate() + 6)) : null
 
   return (
-    <main style={{ maxWidth: 520, margin: '40px auto', padding: '0 24px', fontFamily: 'Arial' }}>
-      <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 4 }}>Planifier la semaine</h1>
-      <p style={{ color: '#666', fontSize: 13, marginBottom: 24 }}>
-        {family.adults} adultes · {family.children} enfants
+    <main style={{ maxWidth: 520, margin: '0 auto', padding: '24px 20px 80px' }}>
+      <h1 style={{ fontFamily: "'Baloo 2', sans-serif", fontSize: 26, fontWeight: 800, color: 'var(--text)', marginBottom: 4 }}>
+        Planifier ma semaine
+      </h1>
+      <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 14, color: 'var(--text-muted)', marginBottom: 24 }}>
+        {family.adults} adulte{family.adults > 1 ? 's' : ''} · {family.children} enfant{family.children > 1 ? 's' : ''}
       </p>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, background: '#f5f5f5', padding: '10px 14px', borderRadius: 10 }}>
-        <button onClick={() => shiftStart(-1)} style={{ width: 32, height: 32, border: '1px solid #ddd', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 18 }}>‹</button>
-        <span style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 500 }}>
-          {startDate && endDate ? `${formatShort(startDate)} – ${endDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}
+      {/* Navigation semaine */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, background: '#fff', border: '2px solid var(--cream-dark)', padding: '10px 16px', borderRadius: 14 }}>
+        <button onClick={() => shiftStart(-1)} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'var(--cream-dark)', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>‹</button>
+        <span style={{ flex: 1, textAlign: 'center', fontFamily: "'Nunito', sans-serif", fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
+          {startDate && endDate ? `${formatShort(startDate)} – ${endDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}` : ''}
         </span>
-        <button onClick={() => shiftStart(1)} style={{ width: 32, height: 32, border: '1px solid #ddd', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 18 }}>›</button>
+        <button onClick={() => shiftStart(1)} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'var(--cream-dark)', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>›</button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+      {/* Cards de jours */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
         {slots.map((slot, i) => (
-          <div key={i} style={{ border: '1px solid #e0e0e0', borderRadius: 10, overflow: 'hidden', opacity: slot.active ? 1 : 0.4 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#fafafa' }}>
-              <input type="checkbox" checked={slot.active} onChange={e => toggleDay(i, e.target.checked)} style={{ width: 16, height: 16, cursor: 'pointer' }} />
-              <span style={{ flex: 1, fontSize: 14, fontWeight: 500 }}>{DAY_NAMES[slot.date.getDay()]}</span>
-              <span style={{ fontSize: 12, color: '#888', marginRight: 8 }}>{formatShort(slot.date)}</span>
+          <div key={i} style={{
+            background: '#fff',
+            border: `2px solid ${slot.active ? 'var(--green)' : 'var(--cream-dark)'}`,
+            borderRadius: 14,
+            overflow: 'hidden',
+            opacity: slot.active ? 1 : 0.5,
+            boxShadow: slot.active ? '0 2px 14px rgba(44,36,22,0.06)' : 'none',
+            background: slot.active ? 'var(--green-light)' : '#fff',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px' }}>
+              <input type="checkbox" checked={slot.active} onChange={e => toggleDay(i, e.target.checked)}
+                style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--green)' }} />
+              <span style={{ flex: 1, fontFamily: "'Nunito', sans-serif", fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
+                {DAY_NAMES[slot.date.getDay()]}
+              </span>
+              <span style={{ fontFamily: "'Nunito', sans-serif", fontSize: 12, color: 'var(--text-muted)', marginRight: 8 }}>{formatShort(slot.date)}</span>
               <div style={{ display: 'flex', gap: 6 }}>
-                {['midi','soir'].map(s => (
-                  <span key={s} onClick={() => slot.active && toggleSlot(i, s)}
-                    style={{ padding: '3px 10px', borderRadius: 20, border: '1px solid', fontSize: 12, cursor: slot.active ? 'pointer' : 'default',
-                      borderColor: slot[s] ? (s === 'midi' ? '#1D9E75' : '#534AB7') : '#ddd',
-                      background: slot[s] ? (s === 'midi' ? '#E1F5EE' : '#EEEDFE') : '#fff',
-                      color: slot[s] ? (s === 'midi' ? '#0F6E56' : '#3C3489') : '#aaa',
-                      fontWeight: slot[s] ? 500 : 400 }}>
-                    {s === 'midi' ? 'Midi' : 'Soir'}
+                {[
+                  { key: 'midi', label: 'Midi', icon: '1F31E', activeBg: 'var(--orange)', activeColor: '#fff', inactiveBg: 'var(--orange-light)', inactiveColor: 'var(--orange-dark)' },
+                  { key: 'soir', label: 'Soir', icon: '1F319', activeBg: 'var(--purple)', activeColor: '#fff', inactiveBg: 'var(--purple-light)', inactiveColor: 'var(--purple)' },
+                ].map(({ key, label, icon, activeBg, activeColor, inactiveBg, inactiveColor }) => (
+                  <span key={key}
+                    onClick={() => slot.active && toggleSlot(i, key)}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                      padding: '4px 10px', borderRadius: 20, fontSize: 12,
+                      fontFamily: "'Nunito', sans-serif", fontWeight: 700,
+                      cursor: slot.active ? 'pointer' : 'default',
+                      background: slot[key] ? activeBg : inactiveBg,
+                      color: slot[key] ? activeColor : inactiveColor,
+                    }}>
+                    <img src={`https://openmoji.org/data/color/svg/${icon}.svg`} alt="" style={{ width: 14, height: 14 }} />
+                    {label}
                   </span>
                 ))}
               </div>
@@ -183,19 +195,46 @@ export default function PlanningPage() {
         ))}
       </div>
 
-      <div style={{ display: 'flex', gap: 16, padding: '10px 14px', background: '#f5f5f5', borderRadius: 10, marginBottom: 20, fontSize: 13 }}>
-        <span><strong>{activeMeals.length}</strong> jours</span>
-        <span><strong>{slots.filter(s=>s.active&&s.midi).length}</strong> déjeuners</span>
-        <span><strong>{slots.filter(s=>s.active&&s.soir).length}</strong> dîners</span>
-        <span><strong>{totalMeals}</strong> repas</span>
+      {/* Stats */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+        {[
+          { label: 'jours', val: activeMeals.length },
+          { label: 'déjeuners', val: slots.filter(s => s.active && s.midi).length },
+          { label: 'dîners', val: slots.filter(s => s.active && s.soir).length },
+          { label: 'repas', val: totalMeals },
+        ].map(({ label, val }) => (
+          <span key={label} style={{ padding: '5px 14px', borderRadius: 20, background: 'var(--cream-dark)', fontFamily: "'Nunito', sans-serif", fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+            <strong>{val}</strong> {label}
+          </span>
+        ))}
       </div>
 
-      {error && <p style={{ color: '#e00', fontSize: 14, padding: '10px 12px', background: '#fff0f0', borderRadius: 8, marginBottom: 16 }}>{error}</p>}
+      {error && <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 14, padding: '10px 14px', background: 'var(--red-light)', color: 'var(--red-dark)', borderRadius: 10, marginBottom: 16 }}>{error}</p>}
 
-      <button onClick={handleGenerate} disabled={generating}
-        style={{ width: '100%', padding: 14, background: generating ? '#aaa' : '#0070f3', color: '#fff', border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 500, cursor: generating ? 'not-allowed' : 'pointer' }}>
-        {generating ? LOADING_STEPS[loadingStep] : 'Générer le menu →'}
+      <button onClick={handleGenerate} disabled={generating} style={{
+        width: '100%', padding: '14px 24px',
+        background: generating ? 'var(--cream-dark)' : 'var(--green)',
+        color: generating ? 'var(--text-muted)' : '#fff',
+        border: 'none', borderRadius: 12,
+        fontFamily: "'Nunito', sans-serif", fontSize: 15, fontWeight: 700,
+        boxShadow: generating ? 'none' : '0 4px 0 var(--green-dark)',
+        cursor: generating ? 'not-allowed' : 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+      }}>
+        {generating ? (
+          <>
+            <span style={{ width: 16, height: 16, border: '3px solid rgba(255,255,255,0.3)', borderTopColor: 'var(--text-muted)', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
+            {LOADING_STEPS[loadingStep]}
+          </>
+        ) : (
+          <>
+            <img src="https://openmoji.org/data/color/svg/2728.svg" alt="" style={{ width: 20, height: 20 }} />
+            Générer le menu
+          </>
+        )}
       </button>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </main>
   )
 }
