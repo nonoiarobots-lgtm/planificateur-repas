@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { toLocalISODate } from '@/lib/date-utils'
 
 const DAY_NAMES = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi']
 
@@ -50,7 +51,7 @@ export default function PlanningPage() {
     setSlots(s)
   }
 
-  function toISO(d) { return d.toISOString().slice(0,10) }
+  function toISO(d) { return toLocalISODate(d) }
   function formatShort(d) { return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) }
 
   function shiftStart(dir) {
