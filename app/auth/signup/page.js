@@ -8,6 +8,8 @@ export default function SignupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -31,7 +33,7 @@ export default function SignupPage() {
     const { error } = await supabase.auth.signUp({ email, password })
 
     if (error) {
-      setError('Erreur lors de l\'inscription. Réessayez.')
+      setError("Erreur lors de l'inscription. Réessayez.")
       setLoading(false)
       return
     }
@@ -52,6 +54,20 @@ export default function SignupPage() {
       </main>
     )
   }
+
+  const eyeButton = (show, toggle) => (
+    <button
+      type="button"
+      onClick={toggle}
+      style={{ position: 'absolute', right: 0, top: 0, height: '100%', padding: '0 12px', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+    >
+      <img
+        src={show ? 'https://openmoji.org/data/color/svg/1F441.svg' : 'https://openmoji.org/data/color/svg/1F648.svg'}
+        alt={show ? 'Masquer' : 'Afficher'}
+        style={{ width: 20, height: 20 }}
+      />
+    </button>
+  )
 
   return (
     <main style={{ maxWidth: 400, margin: '80px auto', padding: '0 24px' }}>
@@ -75,24 +91,30 @@ export default function SignupPage() {
 
         <div>
           <label style={{ display: 'block', marginBottom: 6, fontSize: 14 }}>Mot de passe</label>
-          <input
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            required
-            style={{ width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14 }}
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+              style={{ width: '100%', padding: '10px 44px 10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14 }}
+            />
+            {eyeButton(showPassword, () => setShowPassword(v => !v))}
+          </div>
         </div>
 
         <div>
           <label style={{ display: 'block', marginBottom: 6, fontSize: 14 }}>Confirmer le mot de passe</label>
-          <input
-            type="password"
-            value={confirm}
-            onChange={e => setConfirm(e.target.value)}
-            required
-            style={{ width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14 }}
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showConfirm ? 'text' : 'password'}
+              value={confirm}
+              onChange={e => setConfirm(e.target.value)}
+              required
+              style={{ width: '100%', padding: '10px 44px 10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14 }}
+            />
+            {eyeButton(showConfirm, () => setShowConfirm(v => !v))}
+          </div>
         </div>
 
         {error && (
