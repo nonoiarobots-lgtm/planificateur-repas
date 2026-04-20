@@ -13,7 +13,14 @@ export default function PlanningPage() {
   const [family, setFamily] = useState(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
+  const [loadingStep, setLoadingStep] = useState(0)
   const [error, setError] = useState(null)
+
+  const LOADING_STEPS = [
+    'Composition du menu en cours...',
+    'Sélection des recettes...',
+    'Préparation de la liste de courses...',
+  ]
   const [startDate, setStartDate] = useState(null)
   const [slots, setSlots] = useState([])
 
@@ -80,6 +87,7 @@ export default function PlanningPage() {
     if (!activeMeals.length) { setError('Aucun repas sélectionné.'); return }
     setError(null)
     setGenerating(true)
+    setLoadingStep(0)
 
     const planLines = activeMeals.map(s => {
       const sv = []
@@ -88,19 +96,47 @@ export default function PlanningPage() {
       return `- ${DAY_NAMES[s.date.getDay()]} ${formatShort(s.date)} (${toISO(s.date)}) : ${sv.join(' + ')}`
     }).join('\n')
 
+    const stepTimer = setInterval(() => {
+      setLoadingStep(prev => (prev + 1) % LOADING_STEPS.length)
+    }, 8000)
+
     try {
       const res = await fetch('/api/generate-menu', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ family, planLines, startDate: toISO(startDate) })
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Erreur serveur')
 
-      router.push(`/menu/${data.planningId}`)
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const parts = buffer.split('\n\n')
+        buffer = parts.pop()
+
+        for (const part of parts) {
+          if (!part.startsWith('data: ')) continue
+          const event = JSON.parse(part.slice(6))
+          if (event.type === 'done') {
+            clearInterval(stepTimer)
+            router.push(`/menu/${event.planningId}`)
+            return
+          }
+          if (event.type === 'error') {
+            throw new Error(event.message)
+          }
+        }
+      }
     } catch (err) {
       setError(err.message)
       setGenerating(false)
+    } finally {
+      clearInterval(stepTimer)
     }
   }
 
@@ -158,7 +194,7 @@ export default function PlanningPage() {
 
       <button onClick={handleGenerate} disabled={generating}
         style={{ width: '100%', padding: 14, background: generating ? '#aaa' : '#0070f3', color: '#fff', border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 500, cursor: generating ? 'not-allowed' : 'pointer' }}>
-        {generating ? 'Génération en cours...' : 'Générer le menu →'}
+        {generating ? LOADING_STEPS[loadingStep] : 'Générer le menu →'}
       </button>
     </main>
   )

@@ -29,10 +29,9 @@ export default function MenuPage() {
       if (!plan) { router.push('/planning'); return }
       setPlanning(plan)
 
-      // Récupérer les slots avec recettes
       const { data: slots } = await supabase
         .from('planning_slots')
-        .select('*, recipes(*)')
+        .select('*, recipes(*), emoji_unicode')
         .eq('planning_id', id)
         .order('slot_date')
 
@@ -103,7 +102,12 @@ export default function MenuPage() {
                     }}>
                       {slot.service === 'dejeuner' ? 'Midi' : 'Soir'}
                     </span>
-                    <span style={{ fontSize: 14, flex: 1 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, flex: 1 }}>
+                      <img
+                        src={`https://openmoji.org/data/color/svg/${slot.emoji_unicode || '1F37D'}.svg`}
+                        alt=""
+                        style={{ width: 28, height: 28, flexShrink: 0 }}
+                      />
                       {slot.recipes?.name || 'Recette non trouvée'}
                     </span>
                   </div>
