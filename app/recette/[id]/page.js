@@ -66,77 +66,111 @@ export default function RecettePage() {
     load()
   }, [id])
 
-  if (loading) return <p style={{ padding: 40, fontFamily: 'Arial' }}>Chargement...</p>
-
-  const badge = (label) => ({
-    display: 'inline-block', padding: '3px 10px', borderRadius: 20,
-    background: '#f0f0f0', color: '#555', fontSize: 12, marginRight: 6
-  })
+  if (loading) return (
+    <main style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+      <p style={{ fontFamily: "'Nunito', sans-serif", color: 'var(--text-muted)' }}>Chargement...</p>
+    </main>
+  )
 
   return (
-    <main style={{ maxWidth: 560, margin: '40px auto', padding: '0 24px', fontFamily: 'Arial' }}>
+    <main style={{ maxWidth: 560, margin: '0 auto', padding: '24px 20px 80px' }}>
       <BackButton label="Retour au menu" href={planningId ? `/menu/${planningId}` : null} />
 
-      <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 12 }}>{recipe.name}</h1>
-
-      <div style={{ marginBottom: 20 }}>
-        {recipe.prep_time && <span style={badge()}>⏱ Prépa : {recipe.prep_time}</span>}
-        {recipe.cook_time && <span style={badge()}>🍳 Cuisson : {recipe.cook_time}</span>}
-        {recipe.portions && <span style={badge()}>👥 {recipe.portions} pers.</span>}
+      {/* Header recette */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        {recipe.emoji_unicode && (
+          <img src={`https://openmoji.org/data/color/svg/${recipe.emoji_unicode}.svg`} alt="" style={{ width: 40, height: 40, flexShrink: 0 }} />
+        )}
+        <h1 style={{ fontFamily: "'Baloo 2', sans-serif", fontSize: 24, fontWeight: 800, color: 'var(--text)', margin: 0, lineHeight: 1.2 }}>
+          {recipe.name}
+        </h1>
       </div>
 
+      {/* Pills info */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
+        {recipe.prep_time && (
+          <span style={{ padding: '5px 14px', borderRadius: 20, background: 'var(--cream-dark)', fontFamily: "'Nunito', sans-serif", fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+            ⏱ Prépa : {recipe.prep_time}
+          </span>
+        )}
+        {recipe.cook_time && (
+          <span style={{ padding: '5px 14px', borderRadius: 20, background: 'var(--cream-dark)', fontFamily: "'Nunito', sans-serif", fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+            🍳 Cuisson : {recipe.cook_time}
+          </span>
+        )}
+        {recipe.portions && (
+          <span style={{ padding: '5px 14px', borderRadius: 20, background: 'var(--cream-dark)', fontFamily: "'Nunito', sans-serif", fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+            👥 {recipe.portions} pers.
+          </span>
+        )}
+      </div>
+
+      {/* Ingrédients */}
       {ingredients.length > 0 && (
         <div style={{ marginBottom: 24 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 10 }}>Ingrédients</h2>
-          <div style={{ border: '1px solid #e0e0e0', borderRadius: 12, overflow: 'hidden' }}>
+          <h2 style={{ fontFamily: "'Baloo 2', sans-serif", fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>Ingrédients</h2>
+          <div style={{ background: '#fff', border: '2px solid var(--cream-dark)', borderRadius: 14, overflow: 'hidden', boxShadow: '0 2px 8px rgba(44,36,22,0.06)' }}>
             {ingredients.map((ing, i) => (
               <div key={i} style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '8px 14px', fontSize: 14,
-                borderBottom: i < ingredients.length - 1 ? '1px solid #f0f0f0' : 'none'
+                padding: '10px 16px',
+                borderBottom: i < ingredients.length - 1 ? '1px solid var(--cream-dark)' : 'none',
               }}>
-                <span>{ing.name}</span>
-                <span style={{ color: '#888', fontSize: 13 }}>{ing.quantity} {ing.unit}</span>
+                <span style={{ fontFamily: "'Nunito', sans-serif", fontSize: 15, color: 'var(--text)' }}>{ing.name}</span>
+                <span style={{ fontFamily: "'Nunito', sans-serif", fontSize: 14, fontWeight: 800, color: 'var(--text-muted)' }}>{ing.quantity} {ing.unit}</span>
               </div>
             ))}
           </div>
         </div>
       )}
 
+      {/* Préparation */}
       <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 10 }}>Préparation</h2>
+        <h2 style={{ fontFamily: "'Baloo 2', sans-serif", fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>Préparation</h2>
+
         {generating && (
-          <p style={{ color: '#666', fontSize: 14, padding: '16px', background: '#f5f5f5', borderRadius: 10 }}>
-            Génération de la recette en cours...
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px', background: 'var(--green-light)', borderRadius: 12 }}>
+            <span style={{ width: 18, height: 18, border: '3px solid var(--green-dark)', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+            <span style={{ fontFamily: "'Nunito', sans-serif", fontSize: 14, fontWeight: 600, color: 'var(--green-dark)' }}>Génération de la recette en cours... ✨</span>
+          </div>
         )}
+
         {error && (
-          <p style={{ color: '#e00', fontSize: 14, padding: '10px 12px', background: '#fff0f0', borderRadius: 8 }}>{error}</p>
+          <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 14, padding: '10px 14px', background: 'var(--red-light)', color: 'var(--red-dark)', borderRadius: 10 }}>{error}</p>
         )}
+
         {steps && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {steps.map((step) => (
-              <div key={step.numero} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+              <div key={step.numero} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
                 <span style={{
-                  width: 26, height: 26, borderRadius: '50%', background: '#0070f3',
-                  color: '#fff', fontSize: 12, fontWeight: 600,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                  width: 28, height: 28, borderRadius: '50%', background: 'var(--green)',
+                  color: '#fff', fontSize: 13, fontWeight: 800, fontFamily: "'Nunito', sans-serif",
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  boxShadow: '0 2px 0 var(--green-dark)',
                 }}>
                   {step.numero}
                 </span>
-                <p style={{ fontSize: 14, lineHeight: 1.5, margin: 0, paddingTop: 4 }}>{step.instruction}</p>
+                <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 15, lineHeight: 1.6, margin: 0, paddingTop: 3, color: 'var(--text)' }}>
+                  {step.instruction}
+                </p>
               </div>
             ))}
           </div>
         )}
       </div>
 
+      {/* Conseil du chef */}
       {recipe.tip && (
-        <div style={{ padding: '12px 14px', background: '#FFF9E6', borderRadius: 10, borderLeft: '3px solid #F5A623' }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: '#B8811A' }}>Conseil du chef</span>
-          <p style={{ fontSize: 14, margin: '4px 0 0', color: '#555' }}>{recipe.tip}</p>
+        <div style={{ padding: '14px 16px', background: 'var(--orange-light)', borderRadius: 12, borderLeft: '4px solid var(--orange)' }}>
+          <span style={{ fontFamily: "'Nunito', sans-serif", fontSize: 12, fontWeight: 800, color: 'var(--orange-dark)', display: 'block', marginBottom: 4 }}>
+            ✨ Conseil du chef
+          </span>
+          <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 14, margin: 0, color: 'var(--text)', lineHeight: 1.5 }}>{recipe.tip}</p>
         </div>
       )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </main>
   )
 }
