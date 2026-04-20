@@ -4,38 +4,43 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
-const NAV = [
-  { label: 'Planning', href: '/planning',  icon: '1F4C5', match: (p) => p === '/planning' },
-  { label: 'Menu',     href: '/menu',      icon: '1F37D', match: (p) => p.startsWith('/menu') || p.startsWith('/recette') },
-  { label: 'Courses',  href: '/menu',      icon: '1F6D2', match: () => false },
-  { label: 'Profil',   href: '/profil',    icon: '1F46A', match: (p) => p === '/profil' },
-]
-
 export default function Header() {
   const pathname = usePathname()
   const router = useRouter()
   const [familyLabel, setFamilyLabel] = useState('')
+  const [lastMenuId, setLastMenuId] = useState(null)
 
   useEffect(() => {
-    async function loadFamily() {
+    async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data: fam } = await supabase
-        .from('families')
-        .select('adults, children, name')
-        .eq('user_id', user.id)
-        .single()
-      if (!fam) return
-      setFamilyLabel(fam.name || `${fam.adults} adulte${fam.adults > 1 ? 's' : ''} · ${fam.children} enfant${fam.children > 1 ? 's' : ''}`)
+
+      const [{ data: fam }, { data: planning }] = await Promise.all([
+        supabase.from('families').select('adults, children, name').eq('user_id', user.id).single(),
+        supabase.from('plannings').select('id').order('created_at', { ascending: false }).limit(1).maybeSingle(),
+      ])
+
+      if (fam) setFamilyLabel(fam.name || `${fam.adults} adulte${fam.adults > 1 ? 's' : ''} · ${fam.children} enfant${fam.children > 1 ? 's' : ''}`)
+      if (planning) setLastMenuId(planning.id)
     }
-    loadFamily()
+    load()
   }, [pathname])
 
   if (pathname.startsWith('/auth')) return null
 
+  // Extrait l'ID depuis /menu/[id] si on y est déjà
+  const menuIdFromPath = pathname.startsWith('/menu/') ? pathname.split('/')[2] : null
+  const menuHref = menuIdFromPath || lastMenuId ? `/menu/${menuIdFromPath || lastMenuId}` : '/planning'
+
+  const NAV = [
+    { label: 'Planning', href: '/planning', icon: '1F4C5', match: (p) => p === '/planning' },
+    { label: 'Menu',     href: menuHref,    icon: '1F37D', match: (p) => p.startsWith('/menu') || p.startsWith('/recette') },
+    { label: 'Courses',  href: menuHref,    icon: '1F6D2', match: () => false },
+    { label: 'Profil',   href: '/profil',   icon: '1F46A', match: (p) => p === '/profil' },
+  ]
+
   return (
     <header>
-      {/* Barre top */}
       <div style={{
         background: '#fff',
         borderBottom: '2px solid var(--cream-dark)',
@@ -63,7 +68,6 @@ export default function Header() {
         )}
       </div>
 
-      {/* Barre de navigation */}
       <nav style={{
         background: '#fff',
         borderBottom: '2px solid var(--cream-dark)',
