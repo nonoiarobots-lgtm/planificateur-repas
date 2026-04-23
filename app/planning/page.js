@@ -114,15 +114,14 @@ export default function PlanningPage() {
     setSlots(s => s.map(slot => ({ ...slot, soir: next, active: slot.midi || next })))
   }
 
-  const today = new Date(); today.setHours(0,0,0,0)
+  const todayDate = new Date(); todayDate.setHours(0,0,0,0)
+  const allSlotsPast = slots.length > 0 && slots.every(s => s.past)
   const activeMeals = slots.filter(s => s.active && (s.midi || s.soir))
-  const futureMeals = activeMeals.filter(s => s.date >= today)
-  const allInPast = activeMeals.length > 0 && futureMeals.length === 0
   const totalMeals = slots.reduce((acc, s) => acc + (s.active ? (s.midi ? 1 : 0) + (s.soir ? 1 : 0) : 0), 0)
 
   async function handleGenerate() {
+    if (allSlotsPast) { setError('Cette semaine est déjà passée. Sélectionnez une semaine à venir pour générer un menu.'); return }
     if (!activeMeals.length) { setError('Aucun repas sélectionné.'); return }
-    if (allInPast) { setError('Tous les créneaux sélectionnés sont dans le passé. Inutile de générer un menu pour des jours déjà passés.'); return }
     setError(null)
     setGenerating(true)
     setLoadingStep(0)
@@ -289,8 +288,13 @@ export default function PlanningPage() {
                 style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--green)', flexShrink: 0 }} />
               <span
                 onClick={() => toggleDayClick(i)}
-                style={{ flex: 1, fontFamily: "'Nunito', sans-serif", fontSize: 15, fontWeight: 700, color: 'var(--text)', cursor: 'pointer', userSelect: 'none' }}>
+                style={{ flex: 1, fontFamily: "'Nunito', sans-serif", fontSize: 15, fontWeight: 700, color: 'var(--text)', cursor: slot.past ? 'default' : 'pointer', userSelect: 'none' }}>
                 {DAY_NAMES[slot.date.getDay()]}
+                {slot.past && (
+                  <span style={{ fontFamily: "'Nunito', sans-serif", fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginLeft: 6 }}>
+                    · journée passée
+                  </span>
+                )}
               </span>
               <span style={{ fontFamily: "'Nunito', sans-serif", fontSize: 12, color: 'var(--text-muted)', marginRight: 8 }}>{formatShort(slot.date)}</span>
               <div style={{ display: 'flex', gap: 6 }}>
