@@ -25,6 +25,7 @@ export default function PlanningPage() {
     '✨ Composition du menu en cours...',
     '👨‍🍳 Sélection des recettes...',
     '🛒 Préparation de la liste de courses...',
+    '📖 Génération des étapes de recettes...',
   ]
 
   useEffect(() => {

@@ -8,6 +8,59 @@ const supabase = createClient(
   process.env.SUPABASE_SECRET_KEY
 )
 
+async function generateStepsForRecipe(recipe) {
+  try {
+    const prompt = `Tu es un chef cuisinier expert. Génère les étapes de préparation détaillées pour cette recette.
+
+Recette : ${recipe.name}
+Portions : ${recipe.portions} personnes
+
+INSTRUCTIONS DE QUALITÉ :
+- Base-toi sur des techniques culinaires classiques françaises et éprouvées
+- Sois précis sur les températures (°C), les temps de cuisson et les gestes techniques
+- Si tu mentionnes une température de four, indique aussi le thermostat (ex: 200°C / th.6-7)
+- Les étapes doivent être dans l'ordre chronologique strict
+- Évite les approximations — donne des indicateurs précis (couleur, texture, temps)
+- Adapte les quantités exactement aux ${recipe.portions} portions
+
+Retourne UNIQUEMENT un JSON valide, sans texte avant ni après :
+{
+  "steps": [{"numero": 1, "instruction": "..."}, ...],
+  "prep_time": "15 min",
+  "cook_time": "30 min",
+  "tip": "conseil du chef en une phrase",
+  "search_query": "nom du plat optimisé pour Marmiton"
+}
+
+Entre 6 et 10 étapes. prep_time et cook_time en format court (ex: "20 min", "1h").
+search_query : nom simple en français sans majuscules superflues (ex: "poulet rôti aux herbes").`
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1800,
+      messages: [{ role: 'user', content: prompt }]
+    })
+
+    const raw = message.content[0].text
+    const clean = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+    const result = JSON.parse(clean)
+
+    await supabase
+      .from('recipes')
+      .update({
+        steps: result.steps,
+        prep_time: result.prep_time || null,
+        cook_time: result.cook_time || null,
+        tip: result.tip || null,
+        search_query: result.search_query || null,
+      })
+      .eq('id', recipe.id)
+
+  } catch (err) {
+    console.error(`Erreur génération steps pour ${recipe.name}:`, err.message)
+  }
+}
+
 export async function POST(request) {
   const encoder = new TextEncoder()
 
@@ -66,7 +119,7 @@ Pour emoji_unicode : code hexadécimal OpenMoji à 4-5 caractères représentant
         const { data: familyData } = await supabase
           .from('families')
           .select('id')
-          .eq('adults', family.adults)
+          .eq('user_id', family.user_id)
           .single()
 
         const { data: planning } = await supabase
@@ -78,6 +131,9 @@ Pour emoji_unicode : code hexadécimal OpenMoji à 4-5 caractères représentant
         await supabase
           .from('shopping_lists')
           .insert({ planning_id: planning.id, items: result.liste_courses, needs_refresh: false })
+
+        // Sauvegarder toutes les recettes + slots
+        const recipesToGenerate = []
 
         for (const [dateStr, services] of Object.entries(result.menu)) {
           for (const [service, data] of Object.entries(services)) {
@@ -101,7 +157,18 @@ Pour emoji_unicode : code hexadécimal OpenMoji à 4-5 caractères représentant
                 service: service,
                 emoji_unicode: data.emoji_unicode || null
               })
+
+            // Ne générer les steps que si pas encore générés
+            if (recipe?.id && !recipe.steps) {
+              recipesToGenerate.push(recipe)
+            }
           }
+        }
+
+        // Générer les steps de toutes les recettes en parallèle
+        if (recipesToGenerate.length > 0) {
+          send({ type: 'progress', text: '' }) // keepalive
+          await Promise.all(recipesToGenerate.map(r => generateStepsForRecipe(r)))
         }
 
         send({ type: 'done', planningId: planning.id })
