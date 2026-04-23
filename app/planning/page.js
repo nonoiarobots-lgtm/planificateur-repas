@@ -185,7 +185,7 @@ export default function PlanningPage() {
                       background: slot[key] ? activeBg : inactiveBg,
                       color: slot[key] ? activeColor : inactiveColor,
                     }}>
-                    <img src={`https://openmoji.org/data/color/svg/${icon}.svg`} alt="" style={{ width: 14, height: 14 }} />
+                    <img src={`https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${icon}.svg`} alt="" style={{ width: 14, height: 14 }} />
                     {label}
                   </span>
                 ))}
@@ -228,7 +228,7 @@ export default function PlanningPage() {
           </>
         ) : (
           <>
-            <img src="https://openmoji.org/data/color/svg/2728.svg" alt="" style={{ width: 20, height: 20 }} />
+            <img src="https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/2728.svg" alt="" style={{ width: 20, height: 20 }} />
             Générer le menu
           </>
         )}

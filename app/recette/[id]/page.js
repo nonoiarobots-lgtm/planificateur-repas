@@ -79,7 +79,7 @@ export default function RecettePage() {
       {/* Header recette */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
         {recipe.emoji_unicode && (
-          <img src={`https://openmoji.org/data/color/svg/${recipe.emoji_unicode}.svg`} alt="" style={{ width: 40, height: 40, flexShrink: 0 }} />
+          <img src={`https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${recipe.emoji_unicode}.svg`} alt="" style={{ width: 40, height: 40, flexShrink: 0 }} />
         )}
         <h1 style={{ fontFamily: "'Baloo 2', sans-serif", fontSize: 24, fontWeight: 800, color: 'var(--text)', margin: 0, lineHeight: 1.2 }}>
           {recipe.name}

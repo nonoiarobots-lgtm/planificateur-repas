@@ -35,7 +35,7 @@ export default function SignupPage() {
   const eyeBtn = (show, toggle) => (
     <button type="button" onClick={toggle}
       style={{ position: 'absolute', right: 0, top: 0, height: '100%', padding: '0 12px', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-      <img src={show ? 'https://openmoji.org/data/color/svg/1F441.svg' : 'https://openmoji.org/data/color/svg/1F648.svg'} alt="" style={{ width: 20, height: 20 }} />
+      <img src={show ? 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F441.svg' : 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F648.svg'} alt="" style={{ width: 20, height: 20 }} />
     </button>
   )
 
@@ -59,7 +59,7 @@ export default function SignupPage() {
       <div style={{ width: '100%', maxWidth: 420, background: '#fff', border: '2px solid var(--cream-dark)', borderRadius: 14, boxShadow: '0 2px 14px rgba(44,36,22,0.08)', padding: 32 }}>
 
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <img src="https://openmoji.org/data/color/svg/1F957.svg" alt="" style={{ width: 48, height: 48, marginBottom: 8 }} />
+          <img src="https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F957.svg" alt="" style={{ width: 48, height: 48, marginBottom: 8 }} />
           <h1 style={{ fontFamily: "'Baloo 2', sans-serif", fontSize: 26, fontWeight: 800, color: 'var(--green-dark)', margin: 0 }}>FamiliMeals</h1>
           <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 14, color: 'var(--text-muted)', margin: '4px 0 0' }}>Créer votre compte famille</p>
         </div>

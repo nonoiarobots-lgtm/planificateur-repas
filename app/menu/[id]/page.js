@@ -133,12 +133,12 @@ export default function MenuPage() {
                           background: isMidi ? 'var(--orange-light)' : 'var(--purple-light)',
                           color: isMidi ? 'var(--orange-dark)' : 'var(--purple)',
                         }}>
-                          <img src={`https://openmoji.org/data/color/svg/${isMidi ? '1F31E' : '1F319'}.svg`} alt="" style={{ width: 14, height: 14 }} />
+                          <img src={`https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${isMidi ? '1F31E' : '1F319'}.svg`} alt="" style={{ width: 14, height: 14 }} />
                           {isMidi ? 'Midi' : 'Soir'}
                         </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <img src={`https://openmoji.org/data/color/svg/${slot.emoji_unicode || '1F37D'}.svg`} alt="" style={{ width: 32, height: 32, flexShrink: 0 }} />
+                        <img src={`https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${slot.emoji_unicode || '1F37D'}.svg`} alt="" style={{ width: 32, height: 32, flexShrink: 0 }} />
                         <span style={{ fontFamily: "'Nunito', sans-serif", fontSize: 16, fontWeight: 700, color: 'var(--text)', flex: 1 }}>
                           {slot.recipes?.name || 'Recette non trouvée'}
                         </span>
@@ -150,7 +150,7 @@ export default function MenuPage() {
                             cursor: 'pointer', flexShrink: 0,
                             display: 'inline-flex', alignItems: 'center', gap: 4,
                           }}>
-                            <img src="https://openmoji.org/data/color/svg/1F4D6.svg" alt="" style={{ width: 14, height: 14 }} />
+                            <img src="https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F4D6.svg" alt="" style={{ width: 14, height: 14 }} />
                             Recette
                           </button>
                         )}
@@ -176,7 +176,7 @@ export default function MenuPage() {
               <div key={categorie} style={{ background: '#fff', border: '2px solid var(--cream-dark)', borderRadius: 14, overflow: 'hidden', boxShadow: '0 2px 8px rgba(44,36,22,0.06)' }}>
                 <div style={{ padding: '10px 16px', background: badge.bg, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: "'Nunito', sans-serif", fontSize: 14, fontWeight: 700, color: badge.color }}>
-                    <img src={`https://openmoji.org/data/color/svg/${badge.icon}.svg`} alt="" style={{ width: 18, height: 18 }} />
+                    <img src={`https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${badge.icon}.svg`} alt="" style={{ width: 18, height: 18 }} />
                     {categorie}
                   </span>
                   <span style={{ fontFamily: "'Nunito', sans-serif", fontSize: 12, color: badge.color, opacity: 0.8 }}>{items.length} articles</span>

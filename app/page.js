@@ -41,7 +41,7 @@ export default function Home() {
       padding: '0 24px',
     }}>
       <img
-        src="https://openmoji.org/data/color/svg/1F957.svg"
+        src="https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F957.svg"
         alt=""
         style={{
           width: 72,
