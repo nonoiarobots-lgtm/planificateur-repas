@@ -165,13 +165,14 @@ Pour emoji_unicode : code hexadécimal OpenMoji à 4-5 caractères représentant
           }
         }
 
-        // Générer les steps de toutes les recettes en parallèle
-        if (recipesToGenerate.length > 0) {
-          send({ type: 'progress', text: '' }) // keepalive
-          await Promise.all(recipesToGenerate.map(r => generateStepsForRecipe(r)))
-        }
-
+        // Envoyer done immédiatement — le client navigue sans attendre les steps
         send({ type: 'done', planningId: planning.id })
+
+        // Générer les steps en arrière-plan (fire & forget)
+        if (recipesToGenerate.length > 0) {
+          Promise.all(recipesToGenerate.map(r => generateStepsForRecipe(r)))
+            .catch(err => console.error('Background step generation error:', err))
+        }
 
       } catch (err) {
         console.error('Erreur generate-menu:', err)
