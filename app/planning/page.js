@@ -19,6 +19,7 @@ export default function PlanningPage() {
   const [slots, setSlots] = useState([])
   const [showConstraints, setShowConstraints] = useState(false)
   const [weekConstraints, setWeekConstraints] = useState('')
+  const [lastPlanning, setLastPlanning] = useState(null)
 
   const LOADING_STEPS = [
     '✨ Composition du menu en cours...',
@@ -34,6 +35,17 @@ export default function PlanningPage() {
       const { data: fam } = await supabase.from('families').select('*').eq('user_id', user.id).single()
       if (!fam) { router.push('/profil'); return }
       setFamily(fam)
+
+      // Charger le dernier planning existant
+      const { data: lastPlan } = await supabase
+        .from('plannings')
+        .select('id, start_date')
+        .eq('family_id', fam.id)
+        .order('generated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (lastPlan) setLastPlanning(lastPlan)
+
       const today = new Date()
       today.setHours(0,0,0,0)
       setStartDate(today)
@@ -161,9 +173,35 @@ export default function PlanningPage() {
       <h1 style={{ fontFamily: "'Baloo 2', sans-serif", fontSize: 26, fontWeight: 800, color: 'var(--text)', marginBottom: 4 }}>
         Planifier ma semaine
       </h1>
-      <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 14, color: 'var(--text-muted)', marginBottom: 24 }}>
+      <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 14, color: 'var(--text-muted)', marginBottom: lastPlanning ? 12 : 24 }}>
         {family.adults} adulte{family.adults > 1 ? 's' : ''} · {family.children} enfant{family.children > 1 ? 's' : ''}
       </p>
+
+      {/* Bannière menu en cours */}
+      {lastPlanning && (
+        <button
+          onClick={() => router.push(`/menu/${lastPlanning.id}`)}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            marginBottom: 20, padding: '12px 16px',
+            background: 'var(--green-light)', border: '2px solid var(--green)',
+            borderRadius: 14, cursor: 'pointer',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <img src="https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F37D.svg" width={24} alt="" />
+            <div style={{ textAlign: 'left' }}>
+              <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 13, fontWeight: 800, color: 'var(--green-dark)', margin: 0 }}>
+                Menu en cours
+              </p>
+              <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 12, color: 'var(--green-dark)', margin: 0, opacity: 0.8 }}>
+                Semaine du {new Date(lastPlanning.start_date + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}
+              </p>
+            </div>
+          </div>
+          <span style={{ fontFamily: "'Nunito', sans-serif", fontSize: 13, fontWeight: 700, color: 'var(--green-dark)' }}>Voir →</span>
+        </button>
+      )}
 
       {/* Navigation semaine */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, background: '#fff', border: '2px solid var(--cream-dark)', padding: '10px 16px', borderRadius: 14 }}>
