@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 import BackButton from '@/app/components/BackButton'
+import RecipeModal from '@/app/components/RecipeModal'
 
 const SHOP_BADGES = {
   'Marché / Primeur': { bg: 'var(--green-light)', color: 'var(--green-dark)', icon: '1F966' },
@@ -24,6 +25,7 @@ export default function MenuPage() {
   const [checkedItems, setCheckedItems] = useState(new Set())
   const [activeTab, setActiveTab] = useState('menu')
   const [allPlannings, setAllPlannings] = useState([])
+  const [selectedRecipeId, setSelectedRecipeId] = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -224,7 +226,7 @@ export default function MenuPage() {
                       {/* Boutons Recette + Remplacer */}
                       <div style={{ display: 'flex', gap: 8 }}>
                         {slot.recipes?.id && (
-                          <button onClick={() => router.push(`/recette/${slot.recipes.id}`)} style={{
+                          <button onClick={() => setSelectedRecipeId(slot.recipes.id)} style={{
                             flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                             padding: '8px 12px', borderRadius: 10, border: 'none',
                             background: 'var(--green-light)', color: 'var(--green-dark)',
@@ -296,6 +298,8 @@ export default function MenuPage() {
           })}
         </div>
       )}
+
+      <RecipeModal recipeId={selectedRecipeId} onClose={() => setSelectedRecipeId(null)} />
     </main>
   )
 }
