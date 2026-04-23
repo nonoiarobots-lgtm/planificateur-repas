@@ -17,6 +17,8 @@ export default function PlanningPage() {
   const [error, setError] = useState(null)
   const [startDate, setStartDate] = useState(null)
   const [slots, setSlots] = useState([])
+  const [showConstraints, setShowConstraints] = useState(false)
+  const [weekConstraints, setWeekConstraints] = useState('')
 
   const LOADING_STEPS = [
     '✨ Composition du menu en cours...',
@@ -67,10 +69,31 @@ export default function PlanningPage() {
     setSlots(s)
   }
 
+  function toggleDayClick(i) {
+    const slot = slots[i]
+    const isActive = slot.midi || slot.soir
+    const s = [...slots]
+    s[i] = { ...s[i], active: !isActive, midi: !isActive, soir: !isActive }
+    setSlots(s)
+  }
+
   function toggleSlot(i, slot) {
     const s = [...slots]
     s[i] = { ...s[i], [slot]: !s[i][slot] }
     setSlots(s)
+  }
+
+  const allMidiOn = slots.every(s => s.midi)
+  const allSoirOn = slots.every(s => s.soir)
+
+  function toggleAllMidi() {
+    const next = !allMidiOn
+    setSlots(s => s.map(slot => ({ ...slot, midi: next, active: next || slot.soir })))
+  }
+
+  function toggleAllSoir() {
+    const next = !allSoirOn
+    setSlots(s => s.map(slot => ({ ...slot, soir: next, active: slot.midi || next })))
   }
 
   const activeMeals = slots.filter(s => s.active && (s.midi || s.soir))
@@ -97,7 +120,7 @@ export default function PlanningPage() {
       const res = await fetch('/api/generate-menu', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ family, planLines, startDate: toISO(startDate) })
+        body: JSON.stringify({ family, planLines, startDate: toISO(startDate), weekConstraints })
       })
 
       const reader = res.body.getReader()
@@ -143,7 +166,7 @@ export default function PlanningPage() {
       </p>
 
       {/* Navigation semaine */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, background: '#fff', border: '2px solid var(--cream-dark)', padding: '10px 16px', borderRadius: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, background: '#fff', border: '2px solid var(--cream-dark)', padding: '10px 16px', borderRadius: 14 }}>
         <button onClick={() => shiftStart(-1)} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'var(--cream-dark)', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>‹</button>
         <span style={{ flex: 1, textAlign: 'center', fontFamily: "'Nunito', sans-serif", fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
           {startDate && endDate ? `${formatShort(startDate)} – ${endDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}` : ''}
@@ -151,11 +174,61 @@ export default function PlanningPage() {
         <button onClick={() => shiftStart(1)} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'var(--cream-dark)', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>›</button>
       </div>
 
+      {/* Contraintes semaine (collapsible) */}
+      <div style={{ marginBottom: 10 }}>
+        <button onClick={() => setShowConstraints(!showConstraints)} style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          background: 'none', border: 'none', cursor: 'pointer',
+          fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--text-muted)',
+          padding: '4px 0',
+        }}>
+          <img src="https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/2728.svg" width={16} alt="" />
+          {showConstraints ? 'Masquer les contraintes' : 'Contraintes pour personnaliser le menu'}
+        </button>
+        {showConstraints && (
+          <textarea
+            value={weekConstraints}
+            onChange={e => setWeekConstraints(e.target.value)}
+            placeholder="Ex: pas de four cette semaine, léger le soir, repas rapides…"
+            rows={2}
+            style={{
+              width: '100%', marginTop: 6, padding: '10px 12px',
+              fontFamily: "'Nunito', sans-serif", fontSize: 13, color: 'var(--text)',
+              background: '#fff', border: '2px solid var(--green)',
+              borderRadius: 10, resize: 'none', outline: 'none', boxSizing: 'border-box',
+            }}
+          />
+        )}
+      </div>
+
+      {/* Boutons toggle all */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        <button onClick={toggleAllMidi} style={{
+          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+          padding: '7px 10px', borderRadius: 10, border: 'none', cursor: 'pointer',
+          background: allMidiOn ? 'var(--orange-light)' : 'var(--cream-dark)',
+          fontFamily: "'Nunito', sans-serif", fontSize: 12, fontWeight: 800,
+          color: allMidiOn ? 'var(--orange-dark)' : 'var(--text-muted)',
+        }}>
+          <img src="https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F31E.svg" width={14} alt="" />
+          {allMidiOn ? 'Désélect. tous les midis' : 'Sélect. tous les midis'}
+        </button>
+        <button onClick={toggleAllSoir} style={{
+          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+          padding: '7px 10px', borderRadius: 10, border: 'none', cursor: 'pointer',
+          background: allSoirOn ? 'var(--purple-light)' : 'var(--cream-dark)',
+          fontFamily: "'Nunito', sans-serif", fontSize: 12, fontWeight: 800,
+          color: allSoirOn ? 'var(--purple)' : 'var(--text-muted)',
+        }}>
+          <img src="https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F319.svg" width={14} alt="" />
+          {allSoirOn ? 'Désélect. tous les soirs' : 'Sélect. tous les soirs'}
+        </button>
+      </div>
+
       {/* Cards de jours */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
         {slots.map((slot, i) => (
           <div key={i} style={{
-            background: '#fff',
             border: `2px solid ${slot.active ? 'var(--green)' : 'var(--cream-dark)'}`,
             borderRadius: 14,
             overflow: 'hidden',
@@ -165,8 +238,10 @@ export default function PlanningPage() {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px' }}>
               <input type="checkbox" checked={slot.active} onChange={e => toggleDay(i, e.target.checked)}
-                style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--green)' }} />
-              <span style={{ flex: 1, fontFamily: "'Nunito', sans-serif", fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
+                style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--green)', flexShrink: 0 }} />
+              <span
+                onClick={() => toggleDayClick(i)}
+                style={{ flex: 1, fontFamily: "'Nunito', sans-serif", fontSize: 15, fontWeight: 700, color: 'var(--text)', cursor: 'pointer', userSelect: 'none' }}>
                 {DAY_NAMES[slot.date.getDay()]}
               </span>
               <span style={{ fontFamily: "'Nunito', sans-serif", fontSize: 12, color: 'var(--text-muted)', marginRight: 8 }}>{formatShort(slot.date)}</span>

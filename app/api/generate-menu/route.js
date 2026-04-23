@@ -16,7 +16,7 @@ export async function POST(request) {
       const send = (obj) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`))
 
       try {
-        const { family, planLines, startDate } = await request.json()
+        const { family, planLines, startDate, weekConstraints } = await request.json()
 
         const persons = family.adults + family.children
         const mois = new Date(startDate).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
@@ -26,7 +26,7 @@ export async function POST(request) {
 REPAS À PLANIFIER :
 ${planLines}
 
-CONTRAINTES : saison ${mois}, marché pour légumes/fruits, poissonnerie, boucher, supermarché pour épices. Repas équilibrés, peu sucrés, peu gras.${family.constraints?.length ? '\nRégimes : ' + family.constraints.join(', ') : ''}${family.cuisines?.length ? '\nCuisines : ' + family.cuisines.join(', ') : ''}${family.preferences?.trim() ? '\n\nPRÉFÉRENCES LIBRES DE LA FAMILLE :\n' + family.preferences.trim() : ''}
+CONTRAINTES : saison ${mois}, marché pour légumes/fruits, poissonnerie, boucher, supermarché pour épices. Repas équilibrés, peu sucrés, peu gras.${family.constraints?.length ? '\nRégimes : ' + family.constraints.join(', ') : ''}${family.cuisines?.length ? '\nCuisines : ' + family.cuisines.join(', ') : ''}${family.preferences?.trim() ? '\n\nPRÉFÉRENCES LIBRES DE LA FAMILLE :\n' + family.preferences.trim() : ''}${weekConstraints?.trim() ? '\n\nCONTRAINTES SPÉCIALES CETTE SEMAINE :\n' + weekConstraints.trim() : ''}
 
 RÉPONDS UNIQUEMENT EN JSON VALIDE SANS BACKTICKS NI MARKDOWN :
 {
