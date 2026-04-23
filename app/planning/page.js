@@ -56,11 +56,13 @@ export default function PlanningPage() {
   }, [])
 
   function initSlots(from) {
+    const now = new Date(); now.setHours(0,0,0,0)
     const s = []
     for (let i = 0; i < 7; i++) {
       const d = new Date(from)
       d.setDate(d.getDate() + i)
-      s.push({ date: d, active: true, midi: true, soir: true })
+      const isPast = d < now
+      s.push({ date: d, active: !isPast, midi: !isPast, soir: !isPast, past: isPast })
     }
     setSlots(s)
   }
@@ -76,12 +78,14 @@ export default function PlanningPage() {
   }
 
   function toggleDay(i, checked) {
+    if (slots[i].past) return
     const s = [...slots]
     s[i] = { ...s[i], active: checked, midi: checked, soir: checked }
     setSlots(s)
   }
 
   function toggleDayClick(i) {
+    if (slots[i].past) return
     const slot = slots[i]
     const isActive = slot.midi || slot.soir
     const s = [...slots]
@@ -90,6 +94,7 @@ export default function PlanningPage() {
   }
 
   function toggleSlot(i, slot) {
+    if (slots[i].past) return
     const s = [...slots]
     s[i] = { ...s[i], [slot]: !s[i][slot] }
     setSlots(s)
@@ -108,11 +113,15 @@ export default function PlanningPage() {
     setSlots(s => s.map(slot => ({ ...slot, soir: next, active: slot.midi || next })))
   }
 
+  const today = new Date(); today.setHours(0,0,0,0)
   const activeMeals = slots.filter(s => s.active && (s.midi || s.soir))
+  const futureMeals = activeMeals.filter(s => s.date >= today)
+  const allInPast = activeMeals.length > 0 && futureMeals.length === 0
   const totalMeals = slots.reduce((acc, s) => acc + (s.active ? (s.midi ? 1 : 0) + (s.soir ? 1 : 0) : 0), 0)
 
   async function handleGenerate() {
     if (!activeMeals.length) { setError('Aucun repas sélectionné.'); return }
+    if (allInPast) { setError('Tous les créneaux sélectionnés sont dans le passé. Inutile de générer un menu pour des jours déjà passés.'); return }
     setError(null)
     setGenerating(true)
     setLoadingStep(0)
