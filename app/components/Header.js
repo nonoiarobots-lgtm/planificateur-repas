@@ -4,6 +4,16 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
+function LogoutIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+      <polyline points="16 17 21 12 16 7"/>
+      <line x1="21" y1="12" x2="9" y2="12"/>
+    </svg>
+  )
+}
+
 export default function Header() {
   const pathname = usePathname()
   const router = useRouter()
@@ -61,11 +71,25 @@ export default function Header() {
           <img src="https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F957.svg" alt="" style={{ width: 28, height: 28 }} />
           FamiliMeals
         </div>
-        {familyLabel && (
-          <span style={{ fontFamily: "'Nunito', sans-serif", fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>
-            {familyLabel}
-          </span>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {familyLabel && (
+            <span style={{ fontFamily: "'Nunito', sans-serif", fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>
+              {familyLabel}
+            </span>
+          )}
+          <button
+            onClick={async () => { await supabase.auth.signOut(); router.push('/auth/login') }}
+            title="Se déconnecter"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 30, height: 30, borderRadius: 8, border: 'none',
+              background: 'var(--cream-dark)', color: 'var(--text-muted)',
+              cursor: 'pointer', flexShrink: 0,
+            }}
+          >
+            <LogoutIcon />
+          </button>
+        </div>
       </div>
 
       <nav style={{
