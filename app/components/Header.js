@@ -35,7 +35,7 @@ export default function Header() {
   const NAV = [
     { label: 'Planning', href: '/planning', icon: '1F4C5', match: (p) => p === '/planning' },
     { label: 'Menu',     href: menuHref,    icon: '1F37D', match: (p) => p.startsWith('/menu') || p.startsWith('/recette') },
-    { label: 'Courses',  href: menuHref,    icon: '1F6D2', match: () => false },
+    { label: 'Courses',  href: '/courses',  icon: '1F6D2', match: (p) => p.startsWith('/courses') },
     { label: 'Profil',   href: '/profil',   icon: '1F46A', match: (p) => p === '/profil' },
   ]
 
