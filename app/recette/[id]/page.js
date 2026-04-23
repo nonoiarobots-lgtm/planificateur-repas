@@ -79,7 +79,7 @@ export default function RecettePage() {
       {/* Header recette */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
         {recipe.emoji_unicode && (
-          <img src={`https://openmoji.org/data/color/svg/${recipe.emoji_unicode}.svg`} alt="" style={{ width: 40, height: 40, flexShrink: 0 }} />
+          <img src={`https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${recipe.emoji_unicode}.svg`} alt="" style={{ width: 40, height: 40, flexShrink: 0 }} />
         )}
         <h1 style={{ fontFamily: "'Baloo 2', sans-serif", fontSize: 24, fontWeight: 800, color: 'var(--text)', margin: 0, lineHeight: 1.2 }}>
           {recipe.name}
@@ -162,12 +162,31 @@ export default function RecettePage() {
 
       {/* Conseil du chef */}
       {recipe.tip && (
-        <div style={{ padding: '14px 16px', background: 'var(--orange-light)', borderRadius: 12, borderLeft: '4px solid var(--orange)' }}>
+        <div style={{ padding: '14px 16px', background: 'var(--orange-light)', borderRadius: 12, borderLeft: '4px solid var(--orange)', marginBottom: 16 }}>
           <span style={{ fontFamily: "'Nunito', sans-serif", fontSize: 12, fontWeight: 800, color: 'var(--orange-dark)', display: 'block', marginBottom: 4 }}>
             ✨ Conseil du chef
           </span>
           <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 14, margin: 0, color: 'var(--text)', lineHeight: 1.5 }}>{recipe.tip}</p>
         </div>
+      )}
+
+      {/* Lien Marmiton */}
+      {(recipe.search_query || recipe.name) && (
+        <a
+          href={`https://www.marmiton.org/recettes/recherche.aspx?aqt=${encodeURIComponent(recipe.search_query || recipe.name)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            padding: '12px', borderRadius: 12,
+            background: '#fff', border: '2px solid var(--cream-dark)',
+            fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--text-muted)',
+            textDecoration: 'none',
+          }}
+        >
+          <img src="https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F4BB.svg" width={18} alt="" />
+          Voir des variantes sur Marmiton
+        </a>
       )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

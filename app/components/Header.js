@@ -35,7 +35,7 @@ export default function Header() {
   const NAV = [
     { label: 'Planning', href: '/planning', icon: '1F4C5', match: (p) => p === '/planning' },
     { label: 'Menu',     href: menuHref,    icon: '1F37D', match: (p) => p.startsWith('/menu') || p.startsWith('/recette') },
-    { label: 'Courses',  href: menuHref,    icon: '1F6D2', match: () => false },
+    { label: 'Courses',  href: '/courses',  icon: '1F6D2', match: (p) => p.startsWith('/courses') },
     { label: 'Profil',   href: '/profil',   icon: '1F46A', match: (p) => p === '/profil' },
   ]
 
@@ -58,7 +58,7 @@ export default function Header() {
           onClick={() => router.push('/planning')}
           style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontFamily: "'Baloo 2', sans-serif", fontSize: 20, fontWeight: 800, color: 'var(--green-dark)' }}
         >
-          <img src="https://openmoji.org/data/color/svg/1F957.svg" alt="" style={{ width: 28, height: 28 }} />
+          <img src="https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F957.svg" alt="" style={{ width: 28, height: 28 }} />
           FamiliMeals
         </div>
         {familyLabel && (
@@ -98,7 +98,7 @@ export default function Header() {
               }}
             >
               <img
-                src={`https://openmoji.org/data/color/svg/${icon}.svg`}
+                src={`https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${icon}.svg`}
                 alt=""
                 className="nav-icon"
                 style={{ width: 22, height: 22 }}

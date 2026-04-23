@@ -22,7 +22,7 @@ export default function BackButton({ label = 'Retour', href = null }) {
         marginBottom: 12,
       }}
     >
-      <img src="https://openmoji.org/data/color/svg/2B05.svg" alt="" style={{ width: 18, height: 18 }} />
+      <img src="https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/2B05.svg" alt="" style={{ width: 18, height: 18 }} />
       {label}
     </button>
   )
