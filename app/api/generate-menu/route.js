@@ -173,7 +173,7 @@ export async function POST(request) {
 
         // Relecture (nutrition + faisabilité) et réécriture des seuls repas en rouge
         send({ type: 'status', text: 'Relecture du menu...' })
-        const { meals, shoppingList } = await reviewAndRevise({
+        const { meals, shoppingList, review } = await reviewAndRevise({
           family,
           chefPrompt: prompt,
           meals: draftMeals,
@@ -182,7 +182,7 @@ export async function POST(request) {
 
         const { data: planning, error: planningError } = await supabase
           .from('plannings')
-          .insert({ family_id: family.id, start_date: startDate })
+          .insert({ family_id: family.id, start_date: startDate, review })
           .select()
           .single()
         if (planningError) throw new Error('Enregistrement du planning impossible')
