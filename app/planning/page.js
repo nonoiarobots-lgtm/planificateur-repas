@@ -14,6 +14,7 @@ export default function PlanningPage() {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [loadingStep, setLoadingStep] = useState(0)
+  const [reviewing, setReviewing] = useState(false)
   const [error, setError] = useState(null)
   const [startDate, setStartDate] = useState(null)
   const [slots, setSlots] = useState([])
@@ -26,6 +27,8 @@ export default function PlanningPage() {
     '👨‍🍳 Sélection des recettes...',
     '🛒 Préparation de la liste de courses...',
   ]
+  // Affiché quand le serveur annonce la relecture du menu
+  const REVIEW_STEP = '🔎 Relecture du menu (équilibre et faisabilité)...'
 
   useEffect(() => {
     async function load() {
@@ -123,6 +126,7 @@ export default function PlanningPage() {
     if (!activeMeals.length) { setError('Aucun repas sélectionné.'); return }
     setError(null)
     setGenerating(true)
+    setReviewing(false)
     setLoadingStep(0)
 
     const planLines = activeMeals.map(s => {
@@ -163,6 +167,7 @@ export default function PlanningPage() {
           const event = JSON.parse(part.slice(6))
           if (event.type === 'done') { clearInterval(stepTimer); router.push(`/menu/${event.planningId}`); return }
           if (event.type === 'error') throw new Error(event.message)
+          if (event.type === 'status') { clearInterval(stepTimer); setReviewing(true) }
         }
       }
       throw new Error('La génération a été interrompue. Réessayez.')
@@ -356,7 +361,7 @@ export default function PlanningPage() {
         {generating ? (
           <>
             <span style={{ width: 16, height: 16, border: '3px solid rgba(255,255,255,0.3)', borderTopColor: 'var(--text-muted)', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
-            {LOADING_STEPS[loadingStep]}
+            {reviewing ? REVIEW_STEP : LOADING_STEPS[loadingStep]}
           </>
         ) : (
           <>
