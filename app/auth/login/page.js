@@ -63,6 +63,7 @@ export default function LoginPage() {
                 <img src={showPassword ? 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F441.svg' : 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F648.svg'} alt="" style={{ width: 20, height: 20 }} />
               </button>
             </div>
+            <Link href="/auth/mot-de-passe-oublie" style={{ display: 'inline-block', marginTop: 8, fontFamily: "'Nunito', sans-serif", fontSize: 13, color: 'var(--green-dark)', fontWeight: 600, textDecoration: 'none' }}>Mot de passe oublié ?</Link>
           </div>
 
           {error && <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 14, padding: '10px 14px', background: 'var(--red-light)', color: 'var(--red-dark)', borderRadius: 10, margin: 0 }}>{error}</p>}
@@ -80,7 +81,7 @@ export default function LoginPage() {
 
         <p style={{ textAlign: 'center', marginTop: 20, fontFamily: "'Nunito', sans-serif", fontSize: 14, color: 'var(--text-muted)' }}>
           Pas encore de compte ?{' '}
-          <Link href="/auth/signup" style={{ color: 'var(--green-dark)', fontWeight: 700, textDecoration: 'none' }}>S'inscrire</Link>
+          <Link href="/auth/signup" style={{ color: 'var(--green-dark)', fontWeight: 700, textDecoration: 'none' }}>S&apos;inscrire</Link>
         </p>
       </div>
     </main>
