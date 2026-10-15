@@ -1,8 +1,10 @@
-import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
 import { createSupabaseServer } from '@/lib/supabase-server'
+import { generateStructured, GenerationError } from '@/lib/claude'
+import { MENU_SCHEMA, RECIPE_DETAILS_SCHEMA } from '@/lib/schemas'
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+// Laisse le temps à la génération (réflexion + 14 repas + courses)
+export const maxDuration = 300
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -24,27 +26,16 @@ INSTRUCTIONS DE QUALITÉ :
 - Évite les approximations — donne des indicateurs précis (couleur, texture, temps)
 - Adapte les quantités exactement aux ${recipe.portions} portions
 
-Retourne UNIQUEMENT un JSON valide, sans texte avant ni après :
-{
-  "steps": [{"numero": 1, "instruction": "..."}, ...],
-  "prep_time": "15 min",
-  "cook_time": "30 min",
-  "tip": "conseil du chef en une phrase",
-  "search_query": "nom du plat optimisé pour Marmiton"
-}
-
 Entre 6 et 10 étapes. prep_time et cook_time en format court (ex: "20 min", "1h").
-search_query : nom simple en français sans majuscules superflues (ex: "poulet rôti aux herbes").`
+tip : conseil du chef en une phrase.
+search_query : nom simple en français sans majuscules superflues, optimisé pour Marmiton (ex: "poulet rôti aux herbes").`
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1800,
-      messages: [{ role: 'user', content: prompt }]
+    const result = await generateStructured({
+      prompt,
+      schema: RECIPE_DETAILS_SCHEMA,
+      maxTokens: 8000,
+      effort: 'low',
     })
-
-    const raw = message.content[0].text
-    const clean = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
-    const result = JSON.parse(clean)
 
     await supabase
       .from('recipes')
@@ -115,40 +106,28 @@ ${planLines}
 
 CONTRAINTES : saison ${mois}, marché pour légumes/fruits, poissonnerie, boucher, supermarché pour épices. Repas équilibrés, peu sucrés, peu gras.${family.constraints?.length ? '\nRégimes : ' + family.constraints.join(', ') : ''}${family.cuisines?.length ? '\nCuisines : ' + family.cuisines.join(', ') : ''}${family.preferences?.trim() ? '\n\nPRÉFÉRENCES LIBRES DE LA FAMILLE :\n' + family.preferences.trim() : ''}${weekConstraints?.trim() ? '\n\nCONTRAINTES SPÉCIALES CETTE SEMAINE :\n' + weekConstraints.trim() : ''}
 
-RÉPONDS UNIQUEMENT EN JSON VALIDE SANS BACKTICKS NI MARKDOWN :
-{
-  "menu": {
-    "2026-04-19": {
-      "dejeuner": {"plat": "Nom du plat", "recette_id": "slug_unique", "emoji_unicode": "1F35C"},
-      "diner": {"plat": "Nom du plat", "recette_id": "slug_unique", "emoji_unicode": "1F957"}
-    }
-  },
-  "liste_courses": {
-    "Marché / Primeur": [{"nom":"...","quantite":"...","unite":"..."}],
-    "Poissonnerie": [{"nom":"...","quantite":"...","unite":"..."}],
-    "Boucher": [{"nom":"...","quantite":"...","unite":"..."}],
-    "Supermarché": [{"nom":"...","quantite":"...","unite":"..."}]
-  }
-}
+FORMAT : un élément dans "repas" par repas à planifier (date AAAA-MM-JJ et service "dejeuner" ou "diner"), et la liste de courses de toute la semaine rangée par rayon.
 N'inclus que les dates listées. Quantités pour ${persons} personnes.
-Pour emoji_unicode : code hexadécimal OpenMoji à 4-5 caractères représentant le plat (ex: "1F35C" ramen, "1F957" salade, "1F357" poulet, "1F41F" poisson, "1F966" légumes, "1F373" oeufs, "1F35D" pâtes, "1F35A" riz, "1F969" boeuf, "1F32E" tacos). Sans préfixe "U+" ni "#".`
+emoji_unicode : code hexadécimal OpenMoji à 4-5 caractères représentant le plat (ex: "1F35C" ramen, "1F957" salade, "1F357" poulet, "1F41F" poisson, "1F966" légumes, "1F373" oeufs, "1F35D" pâtes, "1F35A" riz, "1F969" boeuf, "1F32E" tacos). Sans préfixe "U+" ni "#".`
 
-        let fullText = ''
-        const aiStream = anthropic.messages.stream({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 3600,
-          messages: [{ role: 'user', content: prompt }]
+        const result = await generateStructured({
+          prompt,
+          schema: MENU_SCHEMA,
+          maxTokens: 32000,
+          effort: 'medium',
+          onText: (text) => send({ type: 'progress', text }),
         })
 
-        aiStream.on('text', (text) => {
-          fullText += text
-          send({ type: 'progress', text })
+        // Ne garder que les repas demandés, sans doublon
+        const requestedDates = new Set([...planLines.matchAll(/\((\d{4}-\d{2}-\d{2})\)/g)].map(m => m[1]))
+        const seen = new Set()
+        const meals = result.repas.filter(m => {
+          const key = `${m.date}|${m.service}`
+          if (!requestedDates.has(m.date) || seen.has(key)) return false
+          seen.add(key)
+          return true
         })
-
-        await aiStream.finalMessage()
-
-        const clean = fullText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
-        const result = JSON.parse(clean)
+        if (!meals.length) throw new GenerationError("Le menu généré ne correspond à aucun des jours demandés. Réessayez.")
 
         const { data: planning, error: planningError } = await supabase
           .from('plannings')
@@ -164,33 +143,31 @@ Pour emoji_unicode : code hexadécimal OpenMoji à 4-5 caractères représentant
         // Sauvegarder toutes les recettes + slots
         const recipesToGenerate = []
 
-        for (const [dateStr, services] of Object.entries(result.menu)) {
-          for (const [service, data] of Object.entries(services)) {
-            const { data: recipe } = await supabase
-              .from('recipes')
-              .upsert({
-                family_id: family.id,
-                slug: data.recette_id,
-                name: data.plat,
-                portions: persons
-              }, { onConflict: 'family_id,slug' })
-              .select()
-              .single()
+        for (const meal of meals) {
+          const { data: recipe } = await supabase
+            .from('recipes')
+            .upsert({
+              family_id: family.id,
+              slug: meal.recette_id,
+              name: meal.plat,
+              portions: persons
+            }, { onConflict: 'family_id,slug' })
+            .select()
+            .single()
 
-            await supabase
-              .from('planning_slots')
-              .insert({
-                planning_id: planning.id,
-                recipe_id: recipe?.id || null,
-                slot_date: dateStr,
-                service: service,
-                emoji_unicode: data.emoji_unicode || null
-              })
+          await supabase
+            .from('planning_slots')
+            .insert({
+              planning_id: planning.id,
+              recipe_id: recipe?.id || null,
+              slot_date: meal.date,
+              service: meal.service,
+              emoji_unicode: meal.emoji_unicode || null
+            })
 
-            // Ne générer les steps que si pas encore générés
-            if (recipe?.id && !recipe.steps) {
-              recipesToGenerate.push(recipe)
-            }
+          // Ne générer les steps que si pas encore générés
+          if (recipe?.id && !recipe.steps) {
+            recipesToGenerate.push(recipe)
           }
         }
 
@@ -205,7 +182,8 @@ Pour emoji_unicode : code hexadécimal OpenMoji à 4-5 caractères représentant
 
       } catch (err) {
         console.error('Erreur generate-menu:', err)
-        send({ type: 'error', message: err.message })
+        const message = err instanceof GenerationError ? err.message : 'La génération du menu a échoué. Réessayez.'
+        send({ type: 'error', message })
       } finally {
         controller.close()
       }

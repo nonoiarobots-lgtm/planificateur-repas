@@ -1,8 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
 import { createSupabaseServer } from '@/lib/supabase-server'
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+import { generateStructured, GenerationError } from '@/lib/claude'
+import { RECIPE_STEPS_SCHEMA } from '@/lib/schemas'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -57,27 +56,15 @@ INSTRUCTIONS DE QUALITÉ :
 - Évite les approximations comme "cuire jusqu'à ce que ce soit cuit" — donne des indicateurs précis (couleur, texture, temps)
 - Adapte les quantités exactement aux ${recipe.portions} portions indiquées
 
-Retourne UNIQUEMENT un JSON valide, sans texte avant ni après, avec ce format :
-{
-  "steps": [
-    {"numero": 1, "instruction": "..."},
-    {"numero": 2, "instruction": "..."}
-  ],
-  "search_query": "nom du plat optimisé pour Marmiton"
-}
-
 Entre 6 et 10 étapes. Instructions claires, précises, adaptées à un cuisinier amateur.
-Pour search_query : nom du plat en français, simple et direct, sans majuscules superflues, sans "maison" ni "façon" (ex: "poulet rôti aux herbes", "blanquette de veau").`
+search_query : nom du plat en français, simple et direct, sans majuscules superflues, sans "maison" ni "façon" (ex: "poulet rôti aux herbes", "blanquette de veau").`
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1800,
-      messages: [{ role: 'user', content: prompt }]
+    const result = await generateStructured({
+      prompt,
+      schema: RECIPE_STEPS_SCHEMA,
+      maxTokens: 8000,
+      effort: 'low',
     })
-
-    const raw = message.content[0].text
-    const clean = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
-    const result = JSON.parse(clean)
 
     await supabaseAdmin
       .from('recipes')
@@ -88,6 +75,7 @@ Pour search_query : nom du plat en français, simple et direct, sans majuscules 
 
   } catch (err) {
     console.error('Erreur generate-recipe:', err)
-    return Response.json({ error: err.message }, { status: 500 })
+    const message = err instanceof GenerationError ? err.message : 'La génération de la recette a échoué. Réessayez.'
+    return Response.json({ error: message }, { status: 500 })
   }
 }
