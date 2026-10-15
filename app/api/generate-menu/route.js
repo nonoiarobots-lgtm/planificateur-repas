@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createSupabaseServer } from '@/lib/supabase-server'
 import { generateStructured, GenerationError } from '@/lib/claude'
 import { MENU_SCHEMA, RECIPE_DETAILS_SCHEMA } from '@/lib/schemas'
+import { CHEF_SYSTEM, buildChefPrompt } from '@/lib/prompts/chef'
 
 // Laisse le temps à la génération (menu, puis étapes des recettes en arrière-plan)
 export const maxDuration = 300
@@ -57,6 +58,39 @@ search_query : nom simple en français sans majuscules superflues, optimisé pou
   }
 }
 
+const HISTORY_DAYS = 28
+
+// Plats servis à la famille sur les 4 semaines précédant startDate (pour varier les menus).
+// Si une semaine a été générée plusieurs fois, seul le dernier menu de chaque repas compte.
+async function loadHistory(familyId, startDate) {
+  const from = new Date(startDate)
+  from.setDate(from.getDate() - HISTORY_DAYS)
+  const { data, error } = await supabase
+    .from('planning_slots')
+    .select('slot_date, service, recipes(name), plannings!inner(family_id, generated_at)')
+    .eq('plannings.family_id', familyId)
+    .gte('slot_date', from.toISOString().slice(0, 10))
+    .lt('slot_date', startDate)
+  if (error) {
+    console.error('Historique indisponible :', error.message)
+    return []
+  }
+
+  const latest = new Map()
+  for (const slot of data) {
+    if (!slot.recipes?.name) continue
+    const key = `${slot.slot_date}|${slot.service}`
+    const current = latest.get(key)
+    if (!current || slot.plannings.generated_at > current.plannings.generated_at) latest.set(key, slot)
+  }
+
+  const counts = new Map()
+  for (const slot of latest.values()) {
+    counts.set(slot.recipes.name, (counts.get(slot.recipes.name) || 0) + 1)
+  }
+  return [...counts].map(([plat, fois]) => ({ plat, fois }))
+}
+
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 const MAX_PLAN_LINES = 2000
 const MAX_WEEK_CONSTRAINTS = 1000
@@ -88,7 +122,7 @@ export async function POST(request) {
   // La famille est relue en base à partir de l'utilisateur connecté
   const { data: family } = await supabase
     .from('families')
-    .select('id, adults, children, constraints, cuisines, preferences')
+    .select('id, adults, children, children_ages, constraints, cuisines, preferences')
     .eq('user_id', user.id)
     .maybeSingle()
   if (!family) return Response.json({ error: 'Profil famille introuvable : complétez votre profil.' }, { status: 404 })
@@ -113,20 +147,11 @@ export async function POST(request) {
 
       try {
         const persons = family.adults + family.children
-        const mois = new Date(startDate).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
-
-        const prompt = `Tu es un nutritionniste et chef cuisinier expert. Génère un plan repas pour ${family.adults} adultes et ${family.children} enfants à Paris.
-
-REPAS À PLANIFIER :
-${planLines}
-
-CONTRAINTES : saison ${mois}, marché pour légumes/fruits, poissonnerie, boucher, supermarché pour épices. Repas équilibrés, peu sucrés, peu gras.${family.constraints?.length ? '\nRégimes : ' + family.constraints.join(', ') : ''}${family.cuisines?.length ? '\nCuisines : ' + family.cuisines.join(', ') : ''}${family.preferences?.trim() ? '\n\nPRÉFÉRENCES LIBRES DE LA FAMILLE :\n' + family.preferences.trim() : ''}${weekConstraints?.trim() ? '\n\nCONTRAINTES SPÉCIALES CETTE SEMAINE :\n' + weekConstraints.trim() : ''}
-
-FORMAT : un élément dans "repas" par repas à planifier (date AAAA-MM-JJ et service "dejeuner" ou "diner"), et la liste de courses de toute la semaine rangée par rayon.
-N'inclus que les dates listées. Quantités pour ${persons} personnes.
-emoji_unicode : code hexadécimal OpenMoji à 4-5 caractères représentant le plat (ex: "1F35C" ramen, "1F957" salade, "1F357" poulet, "1F41F" poisson, "1F966" légumes, "1F373" oeufs, "1F35D" pâtes, "1F35A" riz, "1F969" boeuf, "1F32E" tacos). Sans préfixe "U+" ni "#".`
+        const history = await loadHistory(family.id, startDate)
+        const prompt = buildChefPrompt({ family, planLines, startDate, weekConstraints, history })
 
         const result = await generateStructured({
+          system: CHEF_SYSTEM,
           prompt,
           schema: MENU_SCHEMA,
           maxTokens: 32000,
