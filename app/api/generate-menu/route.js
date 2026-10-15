@@ -38,7 +38,7 @@ search_query : nom simple en français sans majuscules superflues, optimisé pou
       effort: 'low',
     })
 
-    await supabase
+    const { error } = await supabase
       .from('recipes')
       .update({
         steps: result.steps,
@@ -48,9 +48,12 @@ search_query : nom simple en français sans majuscules superflues, optimisé pou
         search_query: result.search_query || null,
       })
       .eq('id', recipe.id)
+    if (error) throw new Error(`enregistrement impossible : ${error.message}`)
+    return true
 
   } catch (err) {
     console.error(`Erreur génération steps pour ${recipe.name}:`, err.message)
+    return false
   }
 }
 
@@ -94,8 +97,12 @@ export async function POST(request) {
   // after() garde la fonction en vie (Vercel) jusqu'à la fin de ce travail.
   const recipesToGenerate = []
   after(async () => {
+    console.log(`[generate-menu] étapes : ${recipesToGenerate.length} recette(s) à compléter`)
     if (recipesToGenerate.length === 0) return
-    await Promise.all(recipesToGenerate.map(r => generateStepsForRecipe(r)))
+    const t0 = Date.now()
+    const results = await Promise.all(recipesToGenerate.map(r => generateStepsForRecipe(r)))
+    const ok = results.filter(Boolean).length
+    console.log(`[generate-menu] étapes : ${ok}/${results.length} enregistrées en ${Math.round((Date.now() - t0) / 1000)} s`)
   })
 
   const encoder = new TextEncoder()
