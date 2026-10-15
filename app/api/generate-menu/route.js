@@ -1,9 +1,10 @@
+import { after } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createSupabaseServer } from '@/lib/supabase-server'
 import { generateStructured, GenerationError } from '@/lib/claude'
 import { MENU_SCHEMA, RECIPE_DETAILS_SCHEMA } from '@/lib/schemas'
 
-// Laisse le temps à la génération (réflexion + 14 repas + courses)
+// Laisse le temps à la génération (menu, puis étapes des recettes en arrière-plan)
 export const maxDuration = 300
 
 const supabase = createClient(
@@ -89,6 +90,14 @@ export async function POST(request) {
     .maybeSingle()
   if (!family) return Response.json({ error: 'Profil famille introuvable : complétez votre profil.' }, { status: 404 })
 
+  // Recettes dont les étapes seront générées une fois la réponse envoyée.
+  // after() garde la fonction en vie (Vercel) jusqu'à la fin de ce travail.
+  const recipesToGenerate = []
+  after(async () => {
+    if (recipesToGenerate.length === 0) return
+    await Promise.all(recipesToGenerate.map(r => generateStepsForRecipe(r)))
+  })
+
   const encoder = new TextEncoder()
 
   const stream = new ReadableStream({
@@ -141,7 +150,6 @@ emoji_unicode : code hexadécimal OpenMoji à 4-5 caractères représentant le p
           .insert({ planning_id: planning.id, items: result.liste_courses, needs_refresh: false })
 
         // Sauvegarder toutes les recettes + slots
-        const recipesToGenerate = []
 
         for (const meal of meals) {
           const { data: recipe } = await supabase
@@ -171,14 +179,9 @@ emoji_unicode : code hexadécimal OpenMoji à 4-5 caractères représentant le p
           }
         }
 
-        // Envoyer done immédiatement — le client navigue sans attendre les steps
+        // Envoyer done immédiatement — le client navigue sans attendre les steps,
+        // générés ensuite par le callback after() ci-dessus
         send({ type: 'done', planningId: planning.id })
-
-        // Générer les steps en arrière-plan (fire & forget)
-        if (recipesToGenerate.length > 0) {
-          Promise.all(recipesToGenerate.map(r => generateStepsForRecipe(r)))
-            .catch(err => console.error('Background step generation error:', err))
-        }
 
       } catch (err) {
         console.error('Erreur generate-menu:', err)
