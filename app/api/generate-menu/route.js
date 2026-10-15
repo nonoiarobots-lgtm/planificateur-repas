@@ -4,6 +4,7 @@ import { createSupabaseServer } from '@/lib/supabase-server'
 import { generateStructured, GenerationError } from '@/lib/claude'
 import { MENU_SCHEMA, RECIPE_DETAILS_SCHEMA } from '@/lib/schemas'
 import { CHEF_SYSTEM, buildChefPrompt } from '@/lib/prompts/chef'
+import { reviewAndRevise } from '@/lib/relecture'
 
 // Laisse le temps à la génération (menu, puis étapes des recettes en arrière-plan)
 export const maxDuration = 300
@@ -162,24 +163,33 @@ export async function POST(request) {
         // Ne garder que les repas demandés, sans doublon
         const requestedDates = new Set([...planLines.matchAll(/\((\d{4}-\d{2}-\d{2})\)/g)].map(m => m[1]))
         const seen = new Set()
-        const meals = result.repas.filter(m => {
+        const draftMeals = result.repas.filter(m => {
           const key = `${m.date}|${m.service}`
           if (!requestedDates.has(m.date) || seen.has(key)) return false
           seen.add(key)
           return true
         })
-        if (!meals.length) throw new GenerationError("Le menu généré ne correspond à aucun des jours demandés. Réessayez.")
+        if (!draftMeals.length) throw new GenerationError("Le menu généré ne correspond à aucun des jours demandés. Réessayez.")
+
+        // Relecture (nutrition + faisabilité) et réécriture des seuls repas en rouge
+        send({ type: 'status', text: 'Relecture du menu...' })
+        const { meals, shoppingList, review } = await reviewAndRevise({
+          family,
+          chefPrompt: prompt,
+          meals: draftMeals,
+          shoppingList: result.liste_courses,
+        })
 
         const { data: planning, error: planningError } = await supabase
           .from('plannings')
-          .insert({ family_id: family.id, start_date: startDate })
+          .insert({ family_id: family.id, start_date: startDate, review })
           .select()
           .single()
         if (planningError) throw new Error('Enregistrement du planning impossible')
 
         await supabase
           .from('shopping_lists')
-          .insert({ planning_id: planning.id, items: result.liste_courses, needs_refresh: false })
+          .insert({ planning_id: planning.id, items: shoppingList, needs_refresh: false })
 
         // Sauvegarder toutes les recettes + slots
 

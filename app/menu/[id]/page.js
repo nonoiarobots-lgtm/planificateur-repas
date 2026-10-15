@@ -15,6 +15,15 @@ const SHOP_BADGES = {
 
 const EMPTY_ICONS = ['1F634', '1F37D', '1F373', '1F9D1-200D-1F373', '1F959']
 
+// Avis du Relecteur : couleur et libellé de chaque feu
+const FEUX = {
+  vert:   { bg: 'var(--green-light)',  color: 'var(--green-dark)',  dot: 'var(--green)',  label: 'Validé' },
+  orange: { bg: 'var(--orange-light)', color: 'var(--orange-dark)', dot: 'var(--orange)', label: 'À surveiller' },
+  rouge:  { bg: 'var(--red-light)',    color: 'var(--red-dark)',    dot: 'var(--red)',    label: 'À revoir' },
+}
+const FEU_ORDER = ['vert', 'orange', 'rouge']
+const worstFeu = (a, b) => FEU_ORDER[Math.max(FEU_ORDER.indexOf(a), FEU_ORDER.indexOf(b), 0)]
+
 export default function MenuPage() {
   const router = useRouter()
   const { id } = useParams()
@@ -26,6 +35,8 @@ export default function MenuPage() {
   const [activeTab, setActiveTab] = useState('menu')
   const [allPlannings, setAllPlannings] = useState([])
   const [selectedRecipeId, setSelectedRecipeId] = useState(null)
+  const [review, setReview] = useState(null)
+  const [openReviewKey, setOpenReviewKey] = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -56,6 +67,7 @@ export default function MenuPage() {
         .order('slot_date')
 
       setMenu(slots || [])
+      setReview(plan.review?.synthese ? plan.review : null)
 
       if (plan.shopping_lists) {
         setCourses(plan.shopping_lists.items)
@@ -102,6 +114,8 @@ export default function MenuPage() {
   const grouped = menu ? groupByDate(menu) : {}
   const currentIdx = allPlannings.findIndex(p => p.id === id)
   const currentPlanning = allPlannings[currentIdx]
+  const reviewByKey = new Map((review?.repas || []).map(r => [`${r.date}|${r.service}`, r]))
+  const weekFeu = FEUX[review?.feu_semaine]
 
   return (
     <main style={{ maxWidth: 560, margin: '0 auto', padding: '24px 20px 80px' }}>
@@ -173,6 +187,20 @@ export default function MenuPage() {
 
       {activeTab === 'menu' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Avis du Relecteur sur la semaine (absent pour les anciens menus) */}
+          {review && weekFeu && (
+            <div style={{ background: weekFeu.bg, borderRadius: 14, padding: '12px 16px', border: `2px solid ${weekFeu.dot}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: weekFeu.dot, flexShrink: 0 }} />
+                <span style={{ fontFamily: "'Nunito', sans-serif", fontSize: 14, fontWeight: 800, color: weekFeu.color }}>
+                  Avis du relecteur · {weekFeu.label}
+                </span>
+              </div>
+              <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 13, fontWeight: 600, color: 'var(--text)', margin: 0, lineHeight: 1.45 }}>
+                {review.synthese}
+              </p>
+            </div>
+          )}
           {Object.entries(grouped).map(([date, slots], dayIndex) => (
             <div key={date}>
               <h2 style={{ fontFamily: "'Baloo 2', sans-serif", fontSize: 17, fontWeight: 700, color: 'var(--text)', marginBottom: 8, textTransform: 'capitalize' }}>
@@ -203,6 +231,16 @@ export default function MenuPage() {
                     )
                   }
 
+                  const reviewKey = `${slot.slot_date}|${slot.service}`
+                  const mealReview = reviewByKey.get(reviewKey)
+                  const mealFeu = mealReview && (mealReview.remplace
+                    ? FEUX.vert
+                    : FEUX[worstFeu(mealReview.feu_nutrition, mealReview.feu_faisabilite)])
+                  const reviewOpen = mealReview && openReviewKey === reviewKey
+                  const reviewText = mealReview && (mealReview.remplace
+                    ? `Plat corrigé : ${mealReview.raison}`
+                    : [mealReview.raison, mealReview.suggestion].filter(Boolean).join(' — '))
+
                   return (
                     <div key={slot.id} style={{ background: '#fff', border: '2px solid var(--cream-dark)', borderRadius: 14, padding: '12px 16px', boxShadow: '0 2px 8px rgba(44,36,22,0.06)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -216,7 +254,41 @@ export default function MenuPage() {
                           <img src={`https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${isMidi ? '1F31E' : '1F319'}.svg`} alt="" style={{ width: 14, height: 14 }} />
                           {isMidi ? 'Midi' : 'Soir'}
                         </span>
+                        {mealReview && (
+                          <button
+                            onClick={() => setOpenReviewKey(reviewOpen ? null : reviewKey)}
+                            title={reviewText}
+                            aria-expanded={reviewOpen}
+                            style={{
+                              marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5,
+                              padding: '3px 10px', borderRadius: 20, border: 'none', cursor: 'pointer',
+                              fontFamily: "'Nunito', sans-serif", fontSize: 12, fontWeight: 700,
+                              background: mealFeu.bg, color: mealFeu.color,
+                            }}>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: mealFeu.dot }} />
+                            {mealReview.remplace ? 'Corrigé' : mealFeu.label}
+                          </button>
+                        )}
                       </div>
+                      {reviewOpen && (
+                        <div style={{ background: mealFeu.bg, borderRadius: 10, padding: '8px 12px', marginBottom: 10, fontFamily: "'Nunito', sans-serif", fontSize: 12, fontWeight: 600, color: 'var(--text)', lineHeight: 1.45 }}>
+                          {mealReview.remplace ? (
+                            <p style={{ margin: 0 }}>
+                              <strong style={{ color: mealFeu.color }}>Plat corrigé par le relecteur.</strong> Le plat prévu au départ a été remplacé : {mealReview.raison}
+                            </p>
+                          ) : (
+                            <>
+                              <p style={{ margin: '0 0 4px', color: mealFeu.color, fontWeight: 700 }}>
+                                Nutrition : {FEUX[mealReview.feu_nutrition]?.label} · Faisabilité : {FEUX[mealReview.feu_faisabilite]?.label}
+                              </p>
+                              <p style={{ margin: 0 }}>{mealReview.raison}</p>
+                              {mealReview.suggestion && (
+                                <p style={{ margin: '4px 0 0', color: 'var(--text-muted)' }}>💡 {mealReview.suggestion}</p>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                         <img src={`https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${slot.emoji_unicode || '1F37D'}.svg`} alt="" style={{ width: 32, height: 32, flexShrink: 0 }} />
                         <span style={{ fontFamily: "'Nunito', sans-serif", fontSize: 16, fontWeight: 700, color: 'var(--text)', flex: 1 }}>
