@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 import BackButton from '@/app/components/BackButton'
 import RecipeModal from '@/app/components/RecipeModal'
+import ReplaceMealPanel from '@/app/components/ReplaceMealPanel'
 
 const SHOP_BADGES = {
   'Marché / Primeur': { bg: 'var(--green-light)', color: 'var(--green-dark)', icon: '1F966' },
@@ -37,6 +38,7 @@ export default function MenuPage() {
   const [selectedRecipeId, setSelectedRecipeId] = useState(null)
   const [review, setReview] = useState(null)
   const [openReviewKey, setOpenReviewKey] = useState(null)
+  const [replacingSlotId, setReplacingSlotId] = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -89,6 +91,17 @@ export default function MenuPage() {
     setCheckedItems(next)
     const { error } = await supabase.from('shopping_lists').update({ checked_items: [...next] }).eq('id', shoppingListId)
     if (error) console.error('Erreur persistance case:', error)
+  }
+
+  // Le Chef a proposé un autre plat : mettre à jour l'écran sans tout recharger
+  function handleReplaced(slotId, data) {
+    setMenu(prev => prev.map(s => s.id === slotId
+      ? { ...s, recipe_id: data.recipe.id, recipes: { ...data.recipe }, emoji_unicode: data.emoji_unicode }
+      : s))
+    if (data.items) setCourses(data.items)
+    setReview(data.review?.synthese ? data.review : null)
+    setOpenReviewKey(null)
+    setReplacingSlotId(null)
   }
 
   function formatDate(dateStr) {
@@ -237,6 +250,7 @@ export default function MenuPage() {
                     ? FEUX.vert
                     : FEUX[worstFeu(mealReview.feu_nutrition, mealReview.feu_faisabilite)])
                   const reviewOpen = mealReview && openReviewKey === reviewKey
+                  const isReplacing = replacingSlotId === slot.id
                   const reviewText = mealReview && (mealReview.remplace
                     ? `Plat corrigé : ${mealReview.raison}`
                     : [mealReview.raison, mealReview.suggestion].filter(Boolean).join(' — '))
@@ -310,19 +324,27 @@ export default function MenuPage() {
                           </button>
                         )}
                         <button
-                          disabled
-                          title="Disponible prochainement"
+                          onClick={() => setReplacingSlotId(isReplacing ? null : slot.id)}
+                          aria-expanded={isReplacing}
                           style={{
                             flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                            background: 'var(--cream-dark)', border: '1.5px solid transparent',
-                            borderRadius: 10, padding: '8px 12px', cursor: 'not-allowed',
-                            fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--text-muted)',
-                            opacity: 0.6,
+                            background: isReplacing ? 'var(--orange-light)' : 'var(--cream-dark)',
+                            border: `1.5px solid ${isReplacing ? 'var(--orange)' : 'transparent'}`,
+                            borderRadius: 10, padding: '8px 12px', cursor: 'pointer',
+                            fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 13,
+                            color: isReplacing ? 'var(--orange-dark)' : 'var(--text-muted)',
                           }}>
                           <img src="https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F504.svg" alt="" style={{ width: 16, height: 16 }} />
                           Remplacer
                         </button>
                       </div>
+                      {isReplacing && (
+                        <ReplaceMealPanel
+                          slotId={slot.id}
+                          onReplaced={data => handleReplaced(slot.id, data)}
+                          onCancel={() => setReplacingSlotId(null)}
+                        />
+                      )}
                     </div>
                   )
                 })}
