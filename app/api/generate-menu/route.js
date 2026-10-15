@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
+import { createSupabaseServer } from '@/lib/supabase-server'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -61,7 +62,42 @@ search_query : nom simple en français sans majuscules superflues (ex: "poulet r
   }
 }
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+const MAX_PLAN_LINES = 2000
+const MAX_WEEK_CONSTRAINTS = 1000
+
 export async function POST(request) {
+  // Identifier l'utilisateur par sa session (cookies), jamais par un id envoyé par le navigateur
+  const supabaseServer = await createSupabaseServer()
+  const { data: { user } } = await supabaseServer.auth.getUser()
+  if (!user) return Response.json({ error: 'Non authentifié' }, { status: 401 })
+
+  let body
+  try {
+    body = await request.json()
+  } catch {
+    return Response.json({ error: 'Requête invalide' }, { status: 400 })
+  }
+  const { planLines, startDate, weekConstraints } = body
+
+  if (typeof startDate !== 'string' || !ISO_DATE.test(startDate) || isNaN(new Date(startDate))) {
+    return Response.json({ error: 'Date de début invalide' }, { status: 400 })
+  }
+  if (typeof planLines !== 'string' || !planLines.trim() || planLines.length > MAX_PLAN_LINES) {
+    return Response.json({ error: 'Liste des repas invalide' }, { status: 400 })
+  }
+  if (weekConstraints != null && (typeof weekConstraints !== 'string' || weekConstraints.length > MAX_WEEK_CONSTRAINTS)) {
+    return Response.json({ error: `Contraintes de la semaine trop longues (${MAX_WEEK_CONSTRAINTS} caractères max)` }, { status: 400 })
+  }
+
+  // La famille est relue en base à partir de l'utilisateur connecté
+  const { data: family } = await supabase
+    .from('families')
+    .select('id, adults, children, constraints, cuisines, preferences')
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (!family) return Response.json({ error: 'Profil famille introuvable : complétez votre profil.' }, { status: 404 })
+
   const encoder = new TextEncoder()
 
   const stream = new ReadableStream({
@@ -69,8 +105,6 @@ export async function POST(request) {
       const send = (obj) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`))
 
       try {
-        const { family, planLines, startDate, weekConstraints } = await request.json()
-
         const persons = family.adults + family.children
         const mois = new Date(startDate).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
 
@@ -116,17 +150,12 @@ Pour emoji_unicode : code hexadécimal OpenMoji à 4-5 caractères représentant
         const clean = fullText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
         const result = JSON.parse(clean)
 
-        const { data: familyData } = await supabase
-          .from('families')
-          .select('id')
-          .eq('user_id', family.user_id)
-          .single()
-
-        const { data: planning } = await supabase
+        const { data: planning, error: planningError } = await supabase
           .from('plannings')
-          .insert({ family_id: familyData.id, start_date: startDate })
+          .insert({ family_id: family.id, start_date: startDate })
           .select()
           .single()
+        if (planningError) throw new Error('Enregistrement du planning impossible')
 
         await supabase
           .from('shopping_lists')
@@ -140,7 +169,7 @@ Pour emoji_unicode : code hexadécimal OpenMoji à 4-5 caractères représentant
             const { data: recipe } = await supabase
               .from('recipes')
               .upsert({
-                family_id: familyData.id,
+                family_id: family.id,
                 slug: data.recette_id,
                 name: data.plat,
                 portions: persons

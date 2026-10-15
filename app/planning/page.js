@@ -140,8 +140,13 @@ export default function PlanningPage() {
       const res = await fetch('/api/generate-menu', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ family, planLines, startDate: toISO(startDate), weekConstraints })
+        body: JSON.stringify({ planLines, startDate: toISO(startDate), weekConstraints })
       })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'La génération a échoué. Réessayez.')
+      }
 
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
@@ -160,6 +165,7 @@ export default function PlanningPage() {
           if (event.type === 'error') throw new Error(event.message)
         }
       }
+      throw new Error('La génération a été interrompue. Réessayez.')
     } catch (err) {
       setError(err.message)
       setGenerating(false)
