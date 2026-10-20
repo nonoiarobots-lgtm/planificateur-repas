@@ -19,6 +19,16 @@ const nunito = Nunito({
 export const metadata = {
   title: 'FamiliMeals — Planificateur de repas famille',
   description: "Planifiez vos repas en famille avec l'IA",
+  // Nom et style sur l'écran d'accueil de l'iPhone (l'icône vient de app/apple-icon.png)
+  appleWebApp: {
+    capable: true,
+    title: 'FamiliMeals',
+    statusBarStyle: 'default',
+  },
+}
+
+export const viewport = {
+  themeColor: '#4CAF7D',
 }
 
 export default function RootLayout({ children }) {
