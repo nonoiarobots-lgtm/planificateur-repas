@@ -5,7 +5,8 @@ import { generateStructured, GenerationError } from '@/lib/claude'
 import { MENU_SCHEMA } from '@/lib/schemas'
 import { CHEF_SYSTEM, buildChefPrompt } from '@/lib/prompts/chef'
 import { reviewAndRevise } from '@/lib/relecture'
-import { generateStepsForRecipe } from '@/lib/recipe-steps'
+import { generateStepsForRecipe, saveIngredients } from '@/lib/recipe-steps'
+import { normalizeOptions, applyFormat } from '@/lib/menu-rules'
 
 // Laisse le temps à la génération (menu, puis étapes des recettes en arrière-plan)
 export const maxDuration = 300
@@ -65,6 +66,7 @@ export async function POST(request) {
     return Response.json({ error: 'Requête invalide' }, { status: 400 })
   }
   const { planLines, startDate, weekConstraints } = body
+  const options = normalizeOptions(body.options)
 
   if (typeof startDate !== 'string' || !ISO_DATE.test(startDate) || isNaN(new Date(startDate))) {
     return Response.json({ error: 'Date de début invalide' }, { status: 400 })
@@ -105,7 +107,7 @@ export async function POST(request) {
       try {
         const persons = family.adults + family.children
         const history = await loadHistory(family.id, startDate)
-        const prompt = buildChefPrompt({ family, planLines, startDate, weekConstraints, history })
+        const prompt = buildChefPrompt({ family, planLines, startDate, weekConstraints, history, options })
 
         const result = await generateStructured({
           system: CHEF_SYSTEM,
@@ -124,7 +126,7 @@ export async function POST(request) {
           if (!requestedDates.has(m.date) || seen.has(key)) return false
           seen.add(key)
           return true
-        })
+        }).map(m => applyFormat(m, options))
         if (!draftMeals.length) throw new GenerationError("Le menu généré ne correspond à aucun des jours demandés. Réessayez.")
 
         // Relecture (nutrition + faisabilité) et réécriture des seuls repas en rouge
@@ -134,11 +136,12 @@ export async function POST(request) {
           chefPrompt: prompt,
           meals: draftMeals,
           shoppingList: result.liste_courses,
+          options,
         })
 
         const { data: planning, error: planningError } = await supabase
           .from('plannings')
-          .insert({ family_id: family.id, start_date: startDate, review })
+          .insert({ family_id: family.id, start_date: startDate, review, options })
           .select()
           .single()
         if (planningError) throw new Error('Enregistrement du planning impossible')
@@ -168,11 +171,18 @@ export async function POST(request) {
               recipe_id: recipe?.id || null,
               slot_date: meal.date,
               service: meal.service,
-              emoji_unicode: meal.emoji_unicode || null
+              emoji_unicode: meal.emoji_unicode || null,
+              entree: meal.entree?.trim() || null,
+              dessert: meal.dessert?.trim() || null,
             })
 
-          // Ne générer les steps que si pas encore générés
+          // Recette pas encore rédigée : on garde les ingrédients et les temps prévus
+          // par le Chef, que la rédaction des étapes devra respecter
           if (recipe?.id && !recipe.steps) {
+            recipe.prep_time = `${meal.temps_preparation} min`
+            recipe.cook_time = `${meal.temps_cuisson} min`
+            await supabase.from('recipes').update({ prep_time: recipe.prep_time, cook_time: recipe.cook_time }).eq('id', recipe.id)
+            await saveIngredients(recipe.id, meal.ingredients)
             recipesToGenerate.push(recipe)
           }
         }

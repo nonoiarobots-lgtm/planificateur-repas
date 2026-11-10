@@ -4,7 +4,8 @@ import { createSupabaseServer } from '@/lib/supabase-server'
 import { generateStructured, GenerationError } from '@/lib/claude'
 import { MENU_SCHEMA } from '@/lib/schemas'
 import { CHEF_SYSTEM, buildReplacementPrompt } from '@/lib/prompts/chef'
-import { generateStepsForRecipe } from '@/lib/recipe-steps'
+import { generateStepsForRecipe, saveIngredients } from '@/lib/recipe-steps'
+import { normalizeOptions, applyFormat, mealProblems } from '@/lib/menu-rules'
 
 // Laisse le temps au remplacement, puis aux étapes de la recette en arrière-plan
 export const maxDuration = 120
@@ -46,7 +47,7 @@ export async function POST(request) {
 
   const { data: slot } = await supabase
     .from('planning_slots')
-    .select('id, slot_date, service, planning_id, recipes(name), plannings(id, family_id, start_date, review, shopping_lists(id, items))')
+    .select('id, slot_date, service, planning_id, recipes(name), plannings(id, family_id, start_date, review, options, shopping_lists(id, items))')
     .eq('id', slotId)
     .maybeSingle()
   // Même réponse si le repas n'existe pas ou appartient à une autre famille
@@ -59,6 +60,8 @@ export async function POST(request) {
     const t0 = Date.now()
     const planning = slot.plannings
     const shoppingList = planning.shopping_lists
+    // Choix faits à la création du menu (anciens menus : plat seul, sans plats élaborés)
+    const options = normalizeOptions(planning.options)
 
     const { data: weekSlots } = await supabase
       .from('planning_slots')
@@ -70,23 +73,35 @@ export async function POST(request) {
       .map(s => ({ date: s.slot_date, service: s.service, plat: s.recipes.name }))
 
     const meal = { date: slot.slot_date, service: slot.service, plat: slot.recipes.name }
-    const result = await generateStructured({
-      system: CHEF_SYSTEM,
-      prompt: buildReplacementPrompt({
-        family,
-        startDate: planning.start_date,
-        meal,
-        weekMeals,
-        comment,
-        shoppingList: shoppingList?.items,
-      }),
-      schema: MENU_SCHEMA,
-      maxTokens: 16000,
-      effort: 'medium',
+    const basePrompt = buildReplacementPrompt({
+      family,
+      startDate: planning.start_date,
+      meal,
+      weekMeals,
+      comment,
+      shoppingList: shoppingList?.items,
+      options,
     })
 
-    const newMeal = result.repas.find(m => m.date === meal.date && m.service === meal.service) || result.repas[0]
-    if (!newMeal) throw new GenerationError("Le chef n'a pas proposé de plat. Réessayez.")
+    // Une seconde tentative si le plat proposé ne respecte pas les règles de simplicité
+    let result, newMeal, problems = []
+    for (let attempt = 0; attempt < 2; attempt++) {
+      result = await generateStructured({
+        system: CHEF_SYSTEM,
+        prompt: problems.length
+          ? `${basePrompt}\n\nTA PROPOSITION PRÉCÉDENTE « ${newMeal.plat} » NE CONVIENT PAS : ${problems.join(', ')}. Propose un plat plus simple.`
+          : basePrompt,
+        schema: MENU_SCHEMA,
+        maxTokens: 16000,
+        effort: 'medium',
+      })
+      const found = result.repas.find(m => m.date === meal.date && m.service === meal.service) || result.repas[0]
+      if (!found) throw new GenerationError("Le chef n'a pas proposé de plat. Réessayez.")
+      newMeal = applyFormat({ ...found, date: meal.date, service: meal.service }, options)
+      problems = mealProblems(newMeal, options)
+      if (!problems.length) break
+    }
+    if (problems.length) console.log(`[replace-meal] plat gardé malgré : ${problems.join(', ')}`)
 
     const { data: recipe, error: recipeError } = await supabase
       .from('recipes')
@@ -103,7 +118,12 @@ export async function POST(request) {
     const emoji = newMeal.emoji_unicode || null
     const { error: slotError } = await supabase
       .from('planning_slots')
-      .update({ recipe_id: recipe.id, emoji_unicode: emoji })
+      .update({
+        recipe_id: recipe.id,
+        emoji_unicode: emoji,
+        entree: newMeal.entree?.trim() || null,
+        dessert: newMeal.dessert?.trim() || null,
+      })
       .eq('id', slot.id)
     if (slotError) throw new Error(`créneau : ${slotError.message}`)
 
@@ -123,12 +143,20 @@ export async function POST(request) {
       if (error) console.error('[replace-meal] avis non mis à jour :', error.message)
     }
 
-    if (!recipe.steps) after(() => generateStepsForRecipe(recipe))
+    if (!recipe.steps) {
+      recipe.prep_time = `${newMeal.temps_preparation} min`
+      recipe.cook_time = `${newMeal.temps_cuisson} min`
+      await supabase.from('recipes').update({ prep_time: recipe.prep_time, cook_time: recipe.cook_time }).eq('id', recipe.id)
+      await saveIngredients(recipe.id, newMeal.ingredients)
+      after(() => generateStepsForRecipe(recipe))
+    }
 
     console.log(`[replace-meal] « ${meal.plat} » → « ${recipe.name} » en ${Math.round((Date.now() - t0) / 1000)} s`)
     return Response.json({
       recipe: { id: recipe.id, name: recipe.name },
       emoji_unicode: emoji,
+      entree: newMeal.entree?.trim() || null,
+      dessert: newMeal.dessert?.trim() || null,
       items: shoppingList?.id ? result.liste_courses : null,
       review,
     })

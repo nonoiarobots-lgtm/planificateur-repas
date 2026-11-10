@@ -11,31 +11,33 @@ const CAT_META = {
 }
 
 export default function RecipeModal({ recipeId, onClose }) {
-  const [recipe, setRecipe] = useState(null)
-  const [ingredients, setIngredients] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  // Résultat du dernier chargement ; tant qu'il ne correspond pas à recipeId, on est en chargement
+  const [result, setResult] = useState({ id: null, recipe: null, ingredients: [], error: null })
+  const loading = result.id !== recipeId
+  const recipe = loading ? null : result.recipe
+  const ingredients = loading ? [] : result.ingredients
+  const error = loading ? null : result.error
 
   useEffect(() => {
     if (!recipeId) return
-    setLoading(true)
-    setRecipe(null)
-    setError(null)
+    let cancelled = false
 
     async function load() {
+      let rec = null
+      let ings = []
       try {
-        const { data: rec } = await supabase
+        const { data } = await supabase
           .from('recipes')
           .select('*')
           .eq('id', recipeId)
           .single()
+        rec = data
 
-        const { data: ings } = await supabase
+        const { data: ingData } = await supabase
           .from('recipe_ingredients')
           .select('*')
           .eq('recipe_id', recipeId)
-
-        setIngredients(ings || [])
+        ings = ingData || []
 
         if (rec && !rec.steps) {
           const res = await fetch('/api/generate-recipe', {
@@ -45,17 +47,15 @@ export default function RecipeModal({ recipeId, onClose }) {
           })
           const data = await res.json()
           if (!res.ok) throw new Error(data.error || 'Erreur serveur')
-          setRecipe({ ...rec, steps: data.steps, search_query: data.search_query || rec.search_query })
-        } else {
-          setRecipe(rec)
+          rec = { ...rec, steps: data.steps, search_query: data.search_query || rec.search_query }
         }
+        if (!cancelled) setResult({ id: recipeId, recipe: rec, ingredients: ings, error: null })
       } catch (err) {
-        setError(err.message)
-      } finally {
-        setLoading(false)
+        if (!cancelled) setResult({ id: recipeId, recipe: null, ingredients: ings, error: err.message })
       }
     }
     load()
+    return () => { cancelled = true }
   }, [recipeId])
 
   // Fermer sur Escape

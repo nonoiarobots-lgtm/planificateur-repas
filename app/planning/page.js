@@ -20,6 +20,9 @@ export default function PlanningPage() {
   const [slots, setSlots] = useState([])
   const [showConstraints, setShowConstraints] = useState(false)
   const [weekConstraints, setWeekConstraints] = useState('')
+  // 'plat' : plat seul + fruit en dessert ; 'complet' : entrée, plat, dessert
+  const [menuFormat, setMenuFormat] = useState('plat')
+  const [weekendElabore, setWeekendElabore] = useState(false)
   const [lastPlanning, setLastPlanning] = useState(null)
 
   const LOADING_STEPS = [
@@ -144,7 +147,7 @@ export default function PlanningPage() {
       const res = await fetch('/api/generate-menu', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planLines, startDate: toISO(startDate), weekConstraints })
+        body: JSON.stringify({ planLines, startDate: toISO(startDate), weekConstraints, options: { format: menuFormat, weekendElabore } })
       })
 
       if (!res.ok) {
@@ -230,6 +233,31 @@ export default function PlanningPage() {
         </span>
         <button onClick={() => shiftStart(1)} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'var(--cream-dark)', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>›</button>
       </div>
+
+      {/* Format du menu + plats élaborés le week-end */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        {[
+          { value: 'plat', label: 'Plat seul', hint: '+ un fruit en dessert' },
+          { value: 'complet', label: 'Menu complet', hint: 'entrée, plat, dessert' },
+        ].map(opt => {
+          const selected = menuFormat === opt.value
+          return (
+            <button key={opt.value} type="button" onClick={() => setMenuFormat(opt.value)} aria-pressed={selected} style={{
+              flex: 1, padding: '8px 10px', borderRadius: 10, cursor: 'pointer', textAlign: 'center',
+              border: `2px solid ${selected ? 'var(--green)' : 'var(--cream-dark)'}`,
+              background: selected ? 'var(--green-light)' : '#fff',
+              fontFamily: "'Nunito', sans-serif",
+            }}>
+              <span style={{ display: 'block', fontSize: 14, fontWeight: 800, color: selected ? 'var(--green-dark)' : 'var(--text)' }}>{opt.label}</span>
+              <span style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>{opt.hint}</span>
+            </button>
+          )
+        })}
+      </div>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+        <input type="checkbox" checked={weekendElabore} onChange={e => setWeekendElabore(e.target.checked)} style={{ width: 18, height: 18, accentColor: 'var(--green)' }} />
+        Plats élaborés le week-end (mijotés, cuisson longue)
+      </label>
 
       {/* Contraintes semaine (collapsible) */}
       <div style={{ marginBottom: 10 }}>
