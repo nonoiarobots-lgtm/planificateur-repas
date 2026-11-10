@@ -53,7 +53,7 @@ export default function Home() {
         FamiliMeals
       </h1>
       <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 16, color: 'var(--text-muted)', margin: 0 }}>
-        Planifiez vos repas en famille avec l'IA
+        Planifiez vos repas en famille avec l&apos;IA
       </p>
 
       {!checked && (

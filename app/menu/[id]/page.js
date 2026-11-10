@@ -96,7 +96,7 @@ export default function MenuPage() {
   // Le Chef a proposé un autre plat : mettre à jour l'écran sans tout recharger
   function handleReplaced(slotId, data) {
     setMenu(prev => prev.map(s => s.id === slotId
-      ? { ...s, recipe_id: data.recipe.id, recipes: { ...data.recipe }, emoji_unicode: data.emoji_unicode }
+      ? { ...s, recipe_id: data.recipe.id, recipes: { ...data.recipe }, emoji_unicode: data.emoji_unicode, entree: data.entree, dessert: data.dessert }
       : s))
     if (data.items) setCourses(data.items)
     setReview(data.review?.synthese ? data.review : null)
@@ -305,8 +305,16 @@ export default function MenuPage() {
                       )}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                         <img src={`https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${slot.emoji_unicode || '1F37D'}.svg`} alt="" style={{ width: 32, height: 32, flexShrink: 0 }} />
-                        <span style={{ fontFamily: "'Nunito', sans-serif", fontSize: 16, fontWeight: 700, color: 'var(--text)', flex: 1 }}>
-                          {slot.recipes?.name || 'Recette non trouvée'}
+                        <span style={{ flex: 1 }}>
+                          <span style={{ display: 'block', fontFamily: "'Nunito', sans-serif", fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
+                            {slot.recipes?.name || 'Recette non trouvée'}
+                          </span>
+                          {(slot.entree || slot.dessert) && (
+                            <span style={{ display: 'block', marginTop: 2, fontFamily: "'Nunito', sans-serif", fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                              {slot.entree && <span style={{ display: 'block' }}>Entrée : {slot.entree}</span>}
+                              {slot.dessert && <span style={{ display: 'block' }}>Dessert : {slot.dessert}</span>}
+                            </span>
+                          )}
                         </span>
                       </div>
                       {/* Boutons Recette + Remplacer */}
