@@ -4,9 +4,12 @@ import { useState } from 'react'
 
 const SUGGESTIONS = ['Plus simple', 'Plus rapide', 'Plus sain', 'Plus de légumes', 'Sans viande', 'Plus gourmand']
 const MAX_COMMENT = 300
+const ARTICLES = { 'Entrée': "l'entrée", 'Plat': 'le plat', 'Dessert': 'le dessert' }
 
 // Panneau « Remplacer » : la famille dit ce qu'elle veut à la place, le Chef propose un autre plat
-export default function ReplaceMealPanel({ slotId, onReplaced, onCancel }) {
+export default function ReplaceMealPanel({ slotId, toChange = [], kept = [], onReplaced, onCancel }) {
+  const partial = kept.length > 0
+  const changeText = toChange.join(' et ').toLowerCase()
   const [selected, setSelected] = useState([])
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
@@ -40,6 +43,11 @@ export default function ReplaceMealPanel({ slotId, onReplaced, onCancel }) {
       <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>
         Que souhaitez-vous à la place ?
       </p>
+      {partial && (
+        <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 600, color: 'var(--green-dark)', background: 'var(--green-light)', borderRadius: 8, padding: '6px 10px' }}>
+          Le chef change uniquement : <strong>{changeText}</strong>. Conservé car coché : {kept.join(', ').toLowerCase()}.
+        </p>
+      )}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
         {SUGGESTIONS.map(label => {
           const on = selected.includes(label)
@@ -82,7 +90,9 @@ export default function ReplaceMealPanel({ slotId, onReplaced, onCancel }) {
           background: 'var(--green)', color: '#fff', boxShadow: '0 3px 0 var(--green-dark)',
           fontFamily: "'Nunito', sans-serif", fontSize: 13, fontWeight: 700, opacity: loading ? 0.8 : 1,
         }}>
-          {loading ? 'Le chef cherche un autre plat…' : 'Proposer un autre plat'}
+          {loading
+            ? 'Le chef cherche…'
+            : partial ? `Changer ${toChange.map(l => ARTICLES[l]).join(' et ')}` : 'Proposer un autre plat'}
         </button>
       </div>
     </div>

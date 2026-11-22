@@ -27,7 +27,7 @@ export default function Header() {
 
       const [{ data: fam }, { data: planning }] = await Promise.all([
         supabase.from('families').select('adults, children, name').eq('user_id', user.id).single(),
-        supabase.from('plannings').select('id').order('created_at', { ascending: false }).limit(1).maybeSingle(),
+        supabase.from('plannings').select('id').order('generated_at', { ascending: false }).limit(1).maybeSingle(),
       ])
 
       if (fam) setFamilyLabel(fam.name || `${fam.adults} adulte${fam.adults > 1 ? 's' : ''} · ${fam.children} enfant${fam.children > 1 ? 's' : ''}`)

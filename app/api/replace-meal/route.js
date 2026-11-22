@@ -47,7 +47,7 @@ export async function POST(request) {
 
   const { data: slot } = await supabase
     .from('planning_slots')
-    .select('id, slot_date, service, planning_id, recipes(name), plannings(id, family_id, start_date, review, options, shopping_lists(id, items))')
+    .select('id, slot_date, service, planning_id, recipe_id, emoji_unicode, entree, dessert, validated_items, recipes(name), plannings(id, family_id, start_date, review, options, shopping_lists(id, items))')
     .eq('id', slotId)
     .maybeSingle()
   // Même réponse si le repas n'existe pas ou appartient à une autre famille
@@ -55,6 +55,14 @@ export async function POST(request) {
     return Response.json({ error: 'Repas introuvable' }, { status: 404 })
   }
   if (!slot.recipes?.name) return Response.json({ error: 'Aucun plat à remplacer sur ce créneau' }, { status: 400 })
+
+  // Les éléments cochés par la famille sont conservés, seuls les autres sont relancés
+  const present = ['entree', 'plat', 'dessert'].filter(k => k === 'plat' || slot[k])
+  const keep = present.filter(k => slot.validated_items?.[k])
+  if (keep.length === present.length) {
+    return Response.json({ error: 'Tout le repas est validé : décochez ce que vous voulez changer.' }, { status: 400 })
+  }
+  const keepPlat = keep.includes('plat')
 
   try {
     const t0 = Date.now()
@@ -72,7 +80,7 @@ export async function POST(request) {
       .filter(s => s.recipes?.name)
       .map(s => ({ date: s.slot_date, service: s.service, plat: s.recipes.name }))
 
-    const meal = { date: slot.slot_date, service: slot.service, plat: slot.recipes.name }
+    const meal = { date: slot.slot_date, service: slot.service, plat: slot.recipes.name, entree: slot.entree, dessert: slot.dessert }
     const basePrompt = buildReplacementPrompt({
       family,
       startDate: planning.start_date,
@@ -81,6 +89,7 @@ export async function POST(request) {
       comment,
       shoppingList: shoppingList?.items,
       options,
+      keep,
     })
 
     // Une seconde tentative si le plat proposé ne respecte pas les règles de simplicité
@@ -98,24 +107,36 @@ export async function POST(request) {
       const found = result.repas.find(m => m.date === meal.date && m.service === meal.service) || result.repas[0]
       if (!found) throw new GenerationError("Le chef n'a pas proposé de plat. Réessayez.")
       newMeal = applyFormat({ ...found, date: meal.date, service: meal.service }, options)
-      problems = mealProblems(newMeal, options)
+      if (keep.includes('entree')) newMeal.entree = slot.entree
+      if (keep.includes('dessert')) newMeal.dessert = slot.dessert
+      // Plat conservé : ses temps et ingrédients ont déjà été contrôlés à la création
+      problems = keepPlat
+        ? mealProblems(newMeal, options).filter(p => p.startsWith('pas d'))
+        : mealProblems(newMeal, options)
       if (!problems.length) break
     }
     if (problems.length) console.log(`[replace-meal] plat gardé malgré : ${problems.join(', ')}`)
 
-    const { data: recipe, error: recipeError } = await supabase
-      .from('recipes')
-      .upsert({
-        family_id: family.id,
-        slug: newMeal.recette_id,
-        name: newMeal.plat,
-        portions: family.adults + family.children,
-      }, { onConflict: 'family_id,slug' })
-      .select()
-      .single()
-    if (recipeError) throw new Error(`recette : ${recipeError.message}`)
+    let recipe
+    if (keepPlat) {
+      recipe = { id: slot.recipe_id, name: slot.recipes.name, steps: true }
+    } else {
+      const { data, error: recipeError } = await supabase
+        .from('recipes')
+        .upsert({
+          family_id: family.id,
+          slug: newMeal.recette_id,
+          name: newMeal.plat,
+          portions: family.adults + family.children,
+        }, { onConflict: 'family_id,slug' })
+        .select()
+        .single()
+      if (recipeError) throw new Error(`recette : ${recipeError.message}`)
+      recipe = data
+    }
 
-    const emoji = newMeal.emoji_unicode || null
+    const emoji = keepPlat ? slot.emoji_unicode : (newMeal.emoji_unicode || null)
+    const validated_items = Object.fromEntries(keep.map(k => [k, true]))
     const { error: slotError } = await supabase
       .from('planning_slots')
       .update({
@@ -123,6 +144,7 @@ export async function POST(request) {
         emoji_unicode: emoji,
         entree: newMeal.entree?.trim() || null,
         dessert: newMeal.dessert?.trim() || null,
+        validated_items,
       })
       .eq('id', slot.id)
     if (slotError) throw new Error(`créneau : ${slotError.message}`)
@@ -151,12 +173,13 @@ export async function POST(request) {
       after(() => generateStepsForRecipe(recipe))
     }
 
-    console.log(`[replace-meal] « ${meal.plat} » → « ${recipe.name} » en ${Math.round((Date.now() - t0) / 1000)} s`)
+    console.log(`[replace-meal] « ${meal.plat} » → « ${recipe.name} »${keep.length ? ` (gardé : ${keep.join(', ')})` : ''} en ${Math.round((Date.now() - t0) / 1000)} s`)
     return Response.json({
       recipe: { id: recipe.id, name: recipe.name },
       emoji_unicode: emoji,
       entree: newMeal.entree?.trim() || null,
       dessert: newMeal.dessert?.trim() || null,
+      validated_items,
       items: shoppingList?.id ? result.liste_courses : null,
       review,
     })
