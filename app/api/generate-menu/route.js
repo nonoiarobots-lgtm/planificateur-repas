@@ -81,7 +81,7 @@ export async function POST(request) {
   // La famille est relue en base à partir de l'utilisateur connecté
   const { data: family } = await supabase
     .from('families')
-    .select('id, adults, children, children_ages, constraints, cuisines, preferences')
+    .select('id, adults, children, children_ages, constraints, cuisines, preferences, house_rules')
     .eq('user_id', user.id)
     .maybeSingle()
   if (!family) return Response.json({ error: 'Profil famille introuvable : complétez votre profil.' }, { status: 404 })
