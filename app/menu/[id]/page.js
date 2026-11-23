@@ -1,11 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 import BackButton from '@/app/components/BackButton'
 import RecipeModal from '@/app/components/RecipeModal'
 import ReplaceMealPanel from '@/app/components/ReplaceMealPanel'
+import SwapMealSheet from '@/app/components/SwapMealSheet'
+
+const SWAP_FIELDS = ['recipe_id', 'recipes', 'emoji_unicode', 'entree', 'dessert', 'validated_items']
 
 const SHOP_BADGES = {
   'Marché / Primeur': { bg: 'var(--green-light)', color: 'var(--green-dark)', icon: '1F966' },
@@ -43,6 +46,11 @@ export default function MenuPage() {
   const [review, setReview] = useState(null)
   const [openReviewKey, setOpenReviewKey] = useState(null)
   const [replacingSlotId, setReplacingSlotId] = useState(null)
+  const [swapSourceId, setSwapSourceId] = useState(null)
+  const [houseRules, setHouseRules] = useState('')
+  const [flashIds, setFlashIds] = useState([])
+  const [lastSwap, setLastSwap] = useState(null)
+  const toastTimer = useRef(null)
 
   useEffect(() => {
     async function load() {
@@ -74,6 +82,9 @@ export default function MenuPage() {
 
       setMenu(slots || [])
       setReview(plan.review?.synthese ? plan.review : null)
+
+      const { data: fam } = await supabase.from('families').select('house_rules').eq('id', plan.family_id).maybeSingle()
+      setHouseRules(fam?.house_rules || '')
 
       if (plan.shopping_lists) {
         setCourses(plan.shopping_lists.items)
@@ -116,6 +127,46 @@ export default function MenuPage() {
   }
 
   // Le Chef a proposé un autre plat : mettre à jour l'écran sans tout recharger
+  function applySwap(aId, bId, newReview) {
+    setMenu(prev => {
+      const a = prev.find(s => s.id === aId)
+      const b = prev.find(s => s.id === bId)
+      const take = s => Object.fromEntries(SWAP_FIELDS.map(k => [k, s[k]]))
+      return prev.map(s => s.id === aId ? { ...s, ...take(b) } : s.id === bId ? { ...s, ...take(a) } : s)
+    })
+    if (newReview !== undefined) setReview(newReview?.synthese ? newReview : null)
+    setOpenReviewKey(null)
+    setReplacingSlotId(null)
+    setFlashIds([aId, bId])
+    setTimeout(() => setFlashIds([]), 1200)
+  }
+
+  function handleSwapped(aId, bId, newReview) {
+    applySwap(aId, bId, newReview)
+    setSwapSourceId(null)
+    setLastSwap({ aId, bId })
+    clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setLastSwap(null), 6000)
+  }
+
+  async function undoSwap() {
+    const swap = lastSwap
+    clearTimeout(toastTimer.current)
+    setLastSwap(null)
+    try {
+      const res = await fetch('/api/swap-meals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slotA: swap.aId, slotB: swap.bId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      applySwap(swap.aId, swap.bId, data.review)
+    } catch (err) {
+      console.error('Erreur annulation échange:', err)
+    }
+  }
+
   function handleReplaced(slotId, data) {
     setMenu(prev => prev.map(s => s.id === slotId
       ? { ...s, recipe_id: data.recipe.id, recipes: { ...data.recipe }, emoji_unicode: data.emoji_unicode, entree: data.entree, dessert: data.dessert, validated_items: data.validated_items || {} }
@@ -293,7 +344,12 @@ export default function MenuPage() {
                   const validated = isSlotValidated(slot)
 
                   return (
-                    <div key={slot.id} style={{ background: validated ? '#FAFFF9' : '#fff', border: `2px solid ${validated ? 'var(--green)' : 'var(--cream-dark)'}`, borderRadius: 14, padding: '12px 16px', boxShadow: '0 2px 8px rgba(44,36,22,0.06)', transition: 'border-color .2s' }}>
+                    <div key={slot.id} style={{
+                      background: validated ? '#FAFFF9' : '#fff',
+                      border: `2px solid ${validated || flashIds.includes(slot.id) ? 'var(--green)' : 'var(--cream-dark)'}`,
+                      borderRadius: 14, padding: '12px 16px', transition: 'border-color .2s, box-shadow .2s',
+                      boxShadow: flashIds.includes(slot.id) ? '0 0 0 4px rgba(76,175,125,0.2)' : '0 2px 8px rgba(44,36,22,0.06)',
+                    }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                         <span style={{
                           display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -305,6 +361,17 @@ export default function MenuPage() {
                           <img src={`https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${isMidi ? '1F31E' : '1F319'}.svg`} alt="" style={{ width: 14, height: 14 }} />
                           {isMidi ? 'Midi' : 'Soir'}
                         </span>
+                        <button
+                          onClick={() => setSwapSourceId(slot.id)}
+                          aria-label={`Échanger ${slot.recipes.name} avec un autre repas`}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 30,
+                            padding: '0 10px', borderRadius: 20, cursor: 'pointer',
+                            border: '1.5px solid var(--cream-dark)', background: 'var(--cream)',
+                            fontFamily: "'Nunito', sans-serif", fontSize: 12, fontWeight: 700, color: 'var(--text-muted)',
+                          }}>
+                          ⇅ Échanger
+                        </button>
                         {mealReview && (
                           <button
                             onClick={() => setOpenReviewKey(reviewOpen ? null : reviewKey)}
@@ -480,6 +547,31 @@ export default function MenuPage() {
       )}
 
       <RecipeModal recipeId={selectedRecipeId} onClose={() => setSelectedRecipeId(null)} />
+
+      {swapSourceId && menu.find(s => s.id === swapSourceId)?.recipes && (
+        <SwapMealSheet
+          source={menu.find(s => s.id === swapSourceId)}
+          slots={menu}
+          houseRules={houseRules}
+          onSwapped={handleSwapped}
+          onClose={() => setSwapSourceId(null)}
+        />
+      )}
+
+      {lastSwap && (
+        <div role="status" style={{
+          position: 'fixed', left: 16, right: 16, bottom: 'calc(16px + env(safe-area-inset-bottom, 0px))', zIndex: 150,
+          maxWidth: 528, margin: '0 auto', background: 'var(--text)', color: '#fff', borderRadius: 12,
+          padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10,
+          fontFamily: "'Nunito', sans-serif", fontSize: 14, fontWeight: 600, boxShadow: '0 6px 20px rgba(0,0,0,0.2)',
+        }}>
+          <span>Repas échangés</span>
+          <button onClick={undoSwap} style={{
+            marginLeft: 'auto', minHeight: 36, padding: '0 8px', background: 'none', border: 'none', cursor: 'pointer',
+            color: '#8FE0B3', fontFamily: "'Nunito', sans-serif", fontSize: 14, fontWeight: 800,
+          }}>Annuler</button>
+        </div>
+      )}
     </main>
   )
 }
