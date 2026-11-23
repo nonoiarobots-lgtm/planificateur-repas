@@ -22,6 +22,10 @@ const FEUX = {
   orange: { bg: 'var(--orange-light)', color: 'var(--orange-dark)', dot: 'var(--orange)', label: 'À surveiller' },
   rouge:  { bg: 'var(--red-light)',    color: 'var(--red-dark)',    dot: 'var(--red)',    label: 'À revoir' },
 }
+const VALIDATION_LABELS = { entree: 'Entrée', plat: 'Plat', dessert: 'Dessert' }
+const validationItems = slot => ['entree', 'plat', 'dessert'].filter(k => k === 'plat' || slot[k])
+const isSlotValidated = slot => validationItems(slot).every(k => slot.validated_items?.[k])
+
 const FEU_ORDER = ['vert', 'orange', 'rouge']
 const worstFeu = (a, b) => FEU_ORDER[Math.max(FEU_ORDER.indexOf(a), FEU_ORDER.indexOf(b), 0)]
 
@@ -93,10 +97,28 @@ export default function MenuPage() {
     if (error) console.error('Erreur persistance case:', error)
   }
 
+  async function toggleValidation(slot, item) {
+    const previous = slot.validated_items || {}
+    const checked = !previous[item]
+    const setItems = items => setMenu(prev => prev.map(s => s.id === slot.id ? { ...s, validated_items: items } : s))
+    setItems({ ...previous, [item]: checked })
+    try {
+      const res = await fetch('/api/validate-meal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slotId: slot.id, item, checked }),
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error)
+    } catch (err) {
+      console.error('Erreur validation repas:', err)
+      setItems(previous)
+    }
+  }
+
   // Le Chef a proposé un autre plat : mettre à jour l'écran sans tout recharger
   function handleReplaced(slotId, data) {
     setMenu(prev => prev.map(s => s.id === slotId
-      ? { ...s, recipe_id: data.recipe.id, recipes: { ...data.recipe }, emoji_unicode: data.emoji_unicode, entree: data.entree, dessert: data.dessert }
+      ? { ...s, recipe_id: data.recipe.id, recipes: { ...data.recipe }, emoji_unicode: data.emoji_unicode, entree: data.entree, dessert: data.dessert, validated_items: data.validated_items || {} }
       : s))
     if (data.items) setCourses(data.items)
     setReview(data.review?.synthese ? data.review : null)
@@ -129,6 +151,8 @@ export default function MenuPage() {
   const currentPlanning = allPlannings[currentIdx]
   const reviewByKey = new Map((review?.repas || []).map(r => [`${r.date}|${r.service}`, r]))
   const weekFeu = FEUX[review?.feu_semaine]
+  const mealSlots = (menu || []).filter(s => s.recipes)
+  const validatedCount = mealSlots.filter(isSlotValidated).length
 
   return (
     <main style={{ maxWidth: 560, margin: '0 auto', padding: '24px 20px 80px' }}>
@@ -200,6 +224,17 @@ export default function MenuPage() {
 
       {activeTab === 'menu' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {mealSlots.length > 0 && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: "'Nunito', sans-serif", fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 4 }}>
+                <span>Repas validés</span>
+                <span style={{ color: 'var(--green-dark)' }}>{validatedCount} / {mealSlots.length}</span>
+              </div>
+              <div style={{ height: 6, background: 'var(--cream-dark)', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${Math.round(validatedCount / mealSlots.length * 100)}%`, background: 'var(--green)', borderRadius: 3, transition: 'width .3s ease' }} />
+              </div>
+            </div>
+          )}
           {/* Avis du Relecteur sur la semaine (absent pour les anciens menus) */}
           {review && weekFeu && (
             <div style={{ background: weekFeu.bg, borderRadius: 14, padding: '12px 16px', border: `2px solid ${weekFeu.dot}` }}>
@@ -255,8 +290,10 @@ export default function MenuPage() {
                     ? `Plat corrigé : ${mealReview.raison}`
                     : [mealReview.raison, mealReview.suggestion].filter(Boolean).join(' — '))
 
+                  const validated = isSlotValidated(slot)
+
                   return (
-                    <div key={slot.id} style={{ background: '#fff', border: '2px solid var(--cream-dark)', borderRadius: 14, padding: '12px 16px', boxShadow: '0 2px 8px rgba(44,36,22,0.06)' }}>
+                    <div key={slot.id} style={{ background: validated ? '#FAFFF9' : '#fff', border: `2px solid ${validated ? 'var(--green)' : 'var(--cream-dark)'}`, borderRadius: 14, padding: '12px 16px', boxShadow: '0 2px 8px rgba(44,36,22,0.06)', transition: 'border-color .2s' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                         <span style={{
                           display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -282,6 +319,13 @@ export default function MenuPage() {
                             <span style={{ width: 8, height: 8, borderRadius: '50%', background: mealFeu.dot }} />
                             {mealReview.remplace ? 'Corrigé' : mealFeu.label}
                           </button>
+                        )}
+                        {validated && (
+                          <span aria-label="Repas validé" style={{
+                            marginLeft: mealReview ? 0 : 'auto', width: 22, height: 22, borderRadius: '50%',
+                            background: 'var(--green)', color: '#fff', fontSize: 12, fontWeight: 800,
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                          }}>✓</span>
                         )}
                       </div>
                       {reviewOpen && (
@@ -317,6 +361,34 @@ export default function MenuPage() {
                           )}
                         </span>
                       </div>
+                      {/* Validation par composant du repas */}
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                        {validationItems(slot).map(item => {
+                          const checked = !!slot.validated_items?.[item]
+                          return (
+                            <button
+                              key={item}
+                              onClick={() => toggleValidation(slot, item)}
+                              aria-pressed={checked}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 5,
+                                padding: '5px 11px 5px 8px', borderRadius: 20, cursor: 'pointer',
+                                border: `1.5px solid ${checked ? 'var(--green)' : 'var(--cream-dark)'}`,
+                                background: checked ? 'var(--green-light)' : 'var(--cream)',
+                                color: checked ? 'var(--green-dark)' : 'var(--text-muted)',
+                                fontFamily: "'Nunito', sans-serif", fontSize: 12, fontWeight: 700,
+                              }}>
+                              <span style={{
+                                width: 14, height: 14, borderRadius: '50%', fontSize: 8, flexShrink: 0,
+                                border: `2px solid ${checked ? 'var(--green)' : 'currentColor'}`,
+                                background: checked ? 'var(--green)' : 'transparent',
+                                color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                              }}>{checked ? '✓' : ''}</span>
+                              {VALIDATION_LABELS[item]}
+                            </button>
+                          )
+                        })}
+                      </div>
                       {/* Boutons Recette + Remplacer */}
                       <div style={{ display: 'flex', gap: 8 }}>
                         {slot.recipes?.id && (
@@ -334,11 +406,15 @@ export default function MenuPage() {
                         <button
                           onClick={() => setReplacingSlotId(isReplacing ? null : slot.id)}
                           aria-expanded={isReplacing}
+                          disabled={validated}
+                          title={validated ? 'Décochez un élément pour pouvoir remplacer ce repas' : undefined}
                           style={{
+                            opacity: validated ? 0.4 : 1,
+                            cursor: validated ? 'not-allowed' : 'pointer',
                             flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                             background: isReplacing ? 'var(--orange-light)' : 'var(--cream-dark)',
                             border: `1.5px solid ${isReplacing ? 'var(--orange)' : 'transparent'}`,
-                            borderRadius: 10, padding: '8px 12px', cursor: 'pointer',
+                            borderRadius: 10, padding: '8px 12px',
                             fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 13,
                             color: isReplacing ? 'var(--orange-dark)' : 'var(--text-muted)',
                           }}>
@@ -349,6 +425,8 @@ export default function MenuPage() {
                       {isReplacing && (
                         <ReplaceMealPanel
                           slotId={slot.id}
+                          toChange={validationItems(slot).filter(k => !slot.validated_items?.[k]).map(k => VALIDATION_LABELS[k])}
+                          kept={validationItems(slot).filter(k => slot.validated_items?.[k]).map(k => VALIDATION_LABELS[k])}
                           onReplaced={data => handleReplaced(slot.id, data)}
                           onCancel={() => setReplacingSlotId(null)}
                         />

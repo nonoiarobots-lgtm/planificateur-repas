@@ -31,15 +31,13 @@ export default function RecettePage() {
       setRecipe(rec)
       setIngredients(rec.recipe_ingredients || [])
 
-      const { data: slot } = await supabase
+      const { data: slots } = await supabase
         .from('planning_slots')
-        .select('planning_id')
+        .select('planning_id, plannings(generated_at)')
         .eq('recipe_id', id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
 
-      if (slot) setPlanningId(slot.planning_id)
+      const latest = (slots || []).sort((a, b) => (b.plannings?.generated_at || '').localeCompare(a.plannings?.generated_at || ''))[0]
+      if (latest) setPlanningId(latest.planning_id)
 
       if (rec.steps) {
         setSteps(rec.steps)
