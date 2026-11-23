@@ -40,7 +40,7 @@ export async function POST(request) {
 
   const { data: family } = await supabase
     .from('families')
-    .select('id, adults, children, children_ages, constraints, cuisines, preferences')
+    .select('id, adults, children, children_ages, constraints, cuisines, preferences, house_rules')
     .eq('user_id', user.id)
     .maybeSingle()
   if (!family) return Response.json({ error: 'Profil famille introuvable' }, { status: 404 })

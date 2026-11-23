@@ -38,7 +38,7 @@ export default function ProfilPage() {
   const [saved, setSaved] = useState(false)
   const [user, setUser] = useState(null)
   const [family, setFamily] = useState(null)
-  const [form, setForm] = useState({ adults: 2, children: 0, children_ages: '', constraints: [], cuisines: [], preferences: '' })
+  const [form, setForm] = useState({ adults: 2, children: 0, children_ages: '', constraints: [], cuisines: [], preferences: '', house_rules: '' })
 
   // Nom de famille éditable
   const [editingName, setEditingName] = useState(false)
@@ -71,7 +71,8 @@ export default function ProfilPage() {
           children_ages: (data.children_ages || []).join(', '),
           constraints: data.constraints || [],
           cuisines: data.cuisines || [],
-          preferences: data.preferences || ''
+          preferences: data.preferences || '',
+          house_rules: data.house_rules || ''
         })
       }
       setLoading(false)
@@ -107,6 +108,7 @@ export default function ProfilPage() {
       constraints: form.constraints,
       cuisines: form.cuisines,
       preferences: form.preferences,
+      house_rules: form.house_rules.trim() || null,
       updated_at: new Date().toISOString()
     }, { onConflict: 'user_id' })
     setSaving(false)
@@ -257,6 +259,21 @@ export default function ProfilPage() {
             value={form.preferences}
             onChange={e => setForm({ ...form, preferences: e.target.value })}
             rows={4}
+            style={{ ...inputStyle, resize: 'vertical' }}
+          />
+        </div>
+
+        {/* Consignes d'organisation */}
+        <div style={cardStyle}>
+          <h2 style={{ fontFamily: "'Baloo 2', sans-serif", fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 4, marginTop: 0 }}>Consignes d&apos;organisation</h2>
+          <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 13, color: 'var(--text-muted)', margin: '0 0 10px' }}>
+            Vos habitudes de la semaine : le chef les applique à chaque menu et le relecteur les vérifie.
+          </p>
+          <textarea
+            placeholder={"Ex. :\n– Courses une seule fois par semaine : poisson en début de semaine\n– Une soirée restes par semaine\n– Les enfants mangent avant les adultes le soir"}
+            value={form.house_rules}
+            onChange={e => setForm({ ...form, house_rules: e.target.value })}
+            rows={5}
             style={{ ...inputStyle, resize: 'vertical' }}
           />
         </div>

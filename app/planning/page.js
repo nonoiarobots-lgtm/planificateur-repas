@@ -18,7 +18,6 @@ export default function PlanningPage() {
   const [error, setError] = useState(null)
   const [startDate, setStartDate] = useState(null)
   const [slots, setSlots] = useState([])
-  const [showConstraints, setShowConstraints] = useState(false)
   const [weekConstraints, setWeekConstraints] = useState('')
   // 'plat' : plat seul + fruit en dessert ; 'complet' : entrée, plat, dessert
   const [menuFormat, setMenuFormat] = useState('plat')
@@ -259,31 +258,29 @@ export default function PlanningPage() {
         Plats élaborés le week-end (mijotés, cuisson longue)
       </label>
 
-      {/* Contraintes semaine (collapsible) */}
-      <div style={{ marginBottom: 10 }}>
-        <button onClick={() => setShowConstraints(!showConstraints)} style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          background: 'none', border: 'none', cursor: 'pointer',
-          fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--text-muted)',
-          padding: '4px 0',
+      {/* Spécificités de la semaine, toujours visibles */}
+      <div style={{ marginBottom: 12, background: '#fff', border: '2px solid var(--cream-dark)', borderRadius: 14, padding: '10px 12px' }}>
+        <label htmlFor="week-constraints" style={{
+          display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6,
+          fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 14, color: 'var(--text)',
         }}>
-          <img src="https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/2728.svg" width={16} alt="" />
-          {showConstraints ? 'Masquer les contraintes' : 'Contraintes pour personnaliser le menu'}
-        </button>
-        {showConstraints && (
-          <textarea
-            value={weekConstraints}
-            onChange={e => setWeekConstraints(e.target.value)}
-            placeholder="Ex: pas de four cette semaine, léger le soir, repas rapides…"
-            rows={2}
-            style={{
-              width: '100%', marginTop: 6, padding: '10px 12px',
-              fontFamily: "'Nunito', sans-serif", fontSize: 13, color: 'var(--text)',
-              background: '#fff', border: '2px solid var(--green)',
-              borderRadius: 10, resize: 'none', outline: 'none', boxSizing: 'border-box',
-            }}
-          />
-        )}
+          <img src="https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/2728.svg" width={18} alt="" />
+          Cette semaine
+          <span style={{ fontWeight: 600, fontSize: 12, color: 'var(--text-muted)' }}>(facultatif)</span>
+        </label>
+        <textarea
+          id="week-constraints"
+          value={weekConstraints}
+          onChange={e => setWeekConstraints(e.target.value)}
+          placeholder="Invités, restes à finir, légumes déjà à la maison… Ex. : 4 invités samedi soir, reste du poulet, courgettes du jardin"
+          rows={3}
+          style={{
+            width: '100%', padding: '8px 10px',
+            fontFamily: "'Nunito', sans-serif", fontSize: 13, color: 'var(--text)',
+            background: 'var(--cream)', border: '1.5px solid var(--cream-dark)',
+            borderRadius: 10, resize: 'vertical', outline: 'none', boxSizing: 'border-box',
+          }}
+        />
       </div>
 
       {/* Boutons toggle all */}
